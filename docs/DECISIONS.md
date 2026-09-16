@@ -59,3 +59,48 @@ This document records the architectural decisions made for the Titan project. Ea
 - **Consequences**:
   - *Positive*: High document integrity and trustworthiness. Readers know exactly what the system is currently capable of executing.
   - *Negative*: Requires continuous document updates as milestones are completed.
+
+---
+
+## ADR-005: Multi-Process Baseline Runtime Architecture
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: Milestone 2 requires implementing the first minimal working distributed runtime for Titan to establish a static baseline. Workers could theoretically be implemented as threads, async coroutines, or separate OS processes.
+- **Decision**:
+  1. Implement workers as separate OS processes using Python's standard library `multiprocessing` with the `spawn` context.
+  2. Use standard library `multiprocessing.Queue` for inter-process communication (`job_queue` and `result_queue`).
+  3. Prohibit threading for worker execution to avoid Global Interpreter Lock (GIL) concurrency bottlenecks and to guarantee genuine memory isolation between workers.
+- **Consequences**:
+  - *Positive*: True CPU parallelism across multiple hardware cores; crash isolation between worker processes; no third-party daemons required.
+  - *Negative*: IPC serialization overhead via pickle on queues; process creation overhead during initial startup.
+
+---
+
+## ADR-006: At-Most-Once Delivery and Absence of Premature Recovery in Milestone 2
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: In distributed systems, worker crash recovery, message acknowledgment, and redelivery mechanisms add considerable architectural complexity. Implementing complex recovery before establishing a clean static baseline risks coupling failure semantics with baseline measurements.
+- **Decision**:
+  1. Milestone 2 implements strict at-most-once delivery semantics.
+  2. If a worker process terminates mid-execution, its active job is lost and not automatically recovered or redelivered.
+  3. The coordinator remains resilient to worker termination: it does not crash, drains surviving worker results, and accounts for missing jobs as uncompleted/failed in the metrics report.
+  4. Explicitly document this absence of automatic recovery as a known system limitation.
+- **Consequences**:
+  - *Positive*: The baseline remains simple, verifiable, and transparent. We avoid premature speculative recovery protocols.
+  - *Negative*: The runtime is not yet fault-tolerant against crash-stop failures; fault tolerance remains a planned topic for Milestone 4.
+
+---
+
+## ADR-007: Continued Rejection of External Message Brokers (Kafka, Redis) and Databases
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: Standard distributed systems implementations often adopt external brokers (e.g., Apache Kafka, RabbitMQ, Redis) for task distribution.
+- **Decision**:
+  1. Continue using standard library IPC (`multiprocessing.Queue`) exclusively.
+  2. Continue banning Kafka, Redis, and external databases.
+- **Consequences**:
+  - *Positive*: Zero operational dependencies; experiments run locally in milliseconds with deterministic process control. We observe the execution policy rather than third-party broker queuing algorithms.
+  - *Negative*: Task queues cannot scale across physically separate servers without networking extensions.
