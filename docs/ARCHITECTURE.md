@@ -6,7 +6,7 @@ This document serves as the architectural source of truth for Titan. It explicit
 
 ## 1. Confirmed Architecture
 
-As of Milestone 2, the confirmed architecture consists of the **Static Baseline Multi-Process Runtime**:
+As of Milestone 3, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime**:
 
 ```
                                   [ Titan CLI ]
@@ -16,15 +16,18 @@ As of Milestone 2, the confirmed architecture consists of the **Static Baseline 
                     +-------------------------------------+
                     |       StaticRuntime Coordinator     |
                     |        (src/titan/runtime.py)       |
+                    |  - In-Flight Ownership Tracker      |
+                    |  - Process Death Detector           |
+                    |  - Deduplication & Terminal Account |
                     +------------------+------------------+
                                        |
                       +----------------+----------------+
                       |                                 |
-                      v (Job Enqueue)                   | (Result Drain)
+                      v (Job Enqueue & Retries)         | (Events: Acquired + Results)
            +---------------------+                      v
            |   In-Memory Queue   |           +---------------------+
            |    (job_queue)      |           |   In-Memory Queue   |
-           +----------+----------+           |   (result_queue)    |
+           +----------+----------+           |   (event_queue)     |
                       |                      +----------^----------+
         +-------------+-------------+                   |
         |             |             |                   |
@@ -44,41 +47,50 @@ As of Milestone 2, the confirmed architecture consists of the **Static Baseline 
            +---------------------+
 ```
 
-### 1.1 Process Model
-- **Process Isolation**: The runtime executes workers as separate OS processes (`multiprocessing.Process` using the `spawn` context) rather than threads. This provides genuine CPU parallelism across hardware cores and isolates worker address spaces.
-- **Worker Concurrency**: The number of worker processes is statically configured at runtime instantiation (e.g. 1, 2, 4, 8) and remains fixed throughout execution.
-- **Process Termination Tolerance**: If an individual worker process crashes or terminates unexpectedly, the coordinator process does not crash. Surviving workers continue processing remaining queue items, and the coordinator detects missing completions during result draining.
+### 1.1 Process Model & Failure Detection
+- **Process Isolation**: The runtime executes workers as separate OS processes (`multiprocessing.Process` using the `spawn` context).
+- **Process Death Detection**: The coordinator continuously monitors worker process health using native OS lifecycle facilities (`process.is_alive()` and `process.exitcode`).
+- **Failure Classification**: The coordinator explicitly distinguishes:
+  1. *Normal Worker Shutdown*: Triggered by coordinator sentinel tokens during `stop()`; worker exits cleanly with exit code `0`.
+  2. *Intentional Test Failure Injection*: Triggered by CLI flags (`--kill-worker` and `--kill-after-jobs`); worker executes an immediate OS-level exit via `os._exit(42)`.
+  3. *Unexpected Worker Termination*: Unplanned process crash or signal termination (`exitcode != 0` and `exitcode != 42` during active run).
 
-### 1.2 Queue Semantics & Job Lifecycle
-- **Job Enqueue**: The coordinator (producer) enqueues immutable `Job` records onto `job_queue` using standard library inter-process communication (`multiprocessing.Queue`).
-- **Job Acquisition**: Workers invoke blocking `.get()` calls on `job_queue`. Jobs are distributed among available workers in first-available order by the OS kernel and queue locks.
-- **Job Lifecycle States**:
-  1. `PENDING`: Job created and enqueued with timestamp `created_at`.
-  2. `RUNNING`: Worker acquires the job and records timestamp `started_at`.
-  3. `COMPLETED`: Worker successfully executes `execute_workload(work_units)` and records timestamp `completed_at`.
-  4. `FAILED`: An uncaught exception occurs during execution, or the job is marked lost.
-- **Acknowledgment & Representation**: Completed jobs are represented as immutable `JobResult` records containing timing telemetry, worker ID, execution status, and computation result, posted to `result_queue`.
-- **Clean Shutdown**: The coordinator enqueues one `None` sentinel token per worker process onto `job_queue`. Upon encountering a sentinel, the worker exits its processing loop cleanly. The coordinator joins each process with a timeout before terminating lingering processes.
+### 1.2 In-Flight Work Ownership Tracking
+- To answer the critical recovery question: *"Which jobs were assigned to worker X and had not produced a final result when X died?"*, workers emit an immediate `JobAcquired` event to `event_queue` prior to starting computation.
+- The coordinator maintains an in-memory ownership registry: `_in_flight[worker_id][job_id] = Job`.
+- When a worker dies, the coordinator scans `_in_flight[worker_id]` to identify all uncompleted jobs owned by that worker for immediate recovery.
 
-### 1.3 Deterministic Workload
-- Implemented in `src/titan/workload.py`.
-- Executes pure, deterministic modular arithmetic for a specified number of `work_units`.
-- Eliminates non-deterministic timing jitter or external I/O variance, ensuring measurements isolate system scheduling and queuing overheads.
+### 1.3 At-Least-Once Processing & Deduplication Semantics
+- **At-Least-Once Execution**: If a worker terminates mid-job, the job is requeued and re-executed by a surviving or replacement worker. A job may therefore be executed more than once across failures.
+- **Result Deduplication**: The coordinator enforces that each unique `job_id` has **at most one final successful result** recorded.
+- **Stale Result Suppression**: If an earlier slow or presumed-lost attempt eventually deposits a result after a subsequent retry has already succeeded, the coordinator discards the stale result and records it as an ignored duplicate (`duplicate_results_ignored`).
+- **Terminal Accounting Invariant**: At the end of execution, the accounting invariant strictly holds:
+  $$\text{completed\_unique} + \text{failed\_unique} == \text{total\_unique\_submitted}$$
 
-### 1.4 Metrics & Telemetry
+### 1.4 Retry Policy & Job Lifecycle
+- **Configurable Retry Ceiling**: Configured via `--max-retries` (default: 3).
+- **Lifecycle States**:
+  1. `PENDING`: Enqueued and awaiting acquisition.
+  2. `RUNNING`: Acquired by a worker; in-flight ownership established.
+  3. `REQUEUED`: Worker died while job was in-flight; attempt counter incremented ($attempt < max\_retries$) and job placed back onto `job_queue`.
+  4. `COMPLETED`: Workload successfully executed and acknowledged by the coordinator.
+  5. `FAILED`: Max retries exceeded without successful completion, or unrecoverable error.
+
+### 1.5 Worker Replacement
+- When a worker dies, the coordinator spawns a replacement worker process (e.g. `worker-X-r1`) to restore the active worker pool back to the statically configured capacity (`--workers`).
+- Worker replacement restores lost capacity; it does not dynamically scale or adapt worker counts based on load.
+
+### 1.6 Metrics & Telemetry
 - Implemented in `src/titan/metrics.py`.
-- **Wall-Clock Duration ($T_{\text{wall}}$)**: Total elapsed seconds from initial job submission until all results are drained.
-- **Throughput**: $N_{\text{completed}} / T_{\text{wall}}$ (completed jobs per wall-clock second).
-- **Per-Job Latency ($L_i$)**: $T_{\text{completed}, i} - T_{\text{created}, i}$. Measures end-to-end turnaround time including queue waiting and worker compute.
-- **Worker Processing Duration ($D_i$)**: $T_{\text{completed}, i} - T_{\text{started}, i}$. Measures active compute duration on the worker process.
-- **Average Latency**: Arithmetic mean of completed job latencies.
-- **Percentiles ($p50, p95, p99$)**: Calculated using standard scientific linear interpolation over sorted latencies.
+- **Primary Throughput**: $\text{total\_completed\_unique} / T_{\text{wall}}$ (unique jobs/second).
+- **Attempt Throughput**: $\text{total\_execution\_attempts} / T_{\text{wall}}$ (total execution attempts/second).
+- **Recovery Duration**: Elapsed time from the detection of the first worker failure until all recovered jobs reach terminal state.
+- **Failure Telemetry**: Tracks `worker_failures`, `jobs_recovered`, `jobs_permanently_failed`, `total_retries`, and `duplicate_results_ignored`.
 
-### 1.5 Known Limitations of Milestone 2 Baseline
-- **At-Most-Once Delivery**: No job persistence or write-ahead logging. If a worker process is terminated mid-execution before posting its `JobResult`, that job is dropped and counted as failed/unreported.
-- **No Automatic Worker Restart**: Crashed workers are not automatically revived in this baseline.
-- **Local IPC Only**: Worker communication is limited to local inter-process queues on a single host.
-- **Static Scheduling Only**: Jobs are pooled in a single shared queue; no adaptive routing, backpressure, or dynamic concurrency adjustments exist yet.
+### 1.7 Known Limitations of Milestone 3
+- **In-Memory IPC Queues**: Jobs and ownership state exist in memory. A crash of the coordinator process loses all state (persistent distributed logs are not yet implemented).
+- **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
+- **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.
 
 ---
 
@@ -94,45 +106,32 @@ The following components will be introduced in subsequent research milestones:
                       |                              |
                       v                              v
       +-------------------------------+  +-------------------------------+
-      |       Workload Generator      |  |       Failure Injector        |
-      |   (Synthesizes bursty, Poisson|  |    (Injects worker stalls,    |
-      |    and heavy-tailed arrivals) |  |     crashes, and drops)       |
+      |       Workload Generator      |  |   Extended Failure Injector   |
+      |   (Synthesizes bursty, Poisson|  |   (Injects network partitions,|
+      |    and heavy-tailed arrivals) |  |    asymmetric stalls, drops)  |
       +---------------+---------------+  +---------------+---------------+
                       |                                  |
                       +------------------+---------------+
                                          |
                                          v
                          +-------------------------------+
-                         |       Execution Engine        |
-                         |   (Applies execution policy)  |
+                         |   Adaptive Execution Engine   |
+                         |   (Dynamic concurrency limits,|
+                         |    backpressure throttling)   |
                          +---------------+---------------+
-                                         |
-                       +-----------------+-----------------+
-                       |                                   |
-                       v                                   v
-        +-----------------------------+     +-----------------------------+
-        |   Static Execution Policy   |     |  Adaptive Execution Policy  |
-        |  (Fixed workers, FIFO queue,|     |  (Dynamic concurrency limits|
-        |   fixed static dispatch)    |     |   backpressure, load-aware) |
-        +-----------------------------+     +-----------------------------+
 ```
 
-### 2.1 Workload Generator (Milestone 3)
+### 2.1 Workload Generator (Milestone 4)
 - Will synthesize non-uniform arrival distributions (bursty arrival spikes, Poisson processes) and variable job service times to stress test scheduling behavior.
 
-### 2.2 Failure Injector (Milestone 4)
-- Will systematically inject worker crashes, execution stalls, and queue backlogs to evaluate resiliency.
-
-### 2.3 Adaptive Execution Policies (Milestone 5)
-- Will implement dynamic policies (e.g., adaptive concurrency control, dynamic worker scaling, backpressure throttling) to empirically compare against this static baseline.
+### 2.2 Adaptive Execution Policies (Milestone 5)
+- Will implement dynamic policies (e.g., adaptive concurrency control, dynamic backpressure throttling) to empirically compare against this static baseline with recovery.
 
 ---
 
 ## 3. Unresolved Decisions
 
-1. **Networked Node Communication Protocol**:
-   - For multi-machine evaluation: evaluating raw TCP sockets with lightweight binary framing vs HTTP/JSON vs gRPC.
-2. **Telemetry Storage Format for Multi-Trial Sweeps**:
-   - Evaluating streaming newline-delimited JSON (`.jsonl`) vs in-memory structured binary arrays exported to Parquet/CSV.
-3. **Failure Recovery Semantics**:
-   - Determining whether recovery should use coordinator-tracked lease renewals / heartbeats or an acknowledged transaction queue.
+1. **Networked Inter-Node RPC Protocol**:
+   - Evaluating raw TCP framing vs lightweight HTTP/1.1 vs gRPC for multi-host clusters.
+2. **Persistent Telemetry Formats**:
+   - Evaluating JSON Lines (`.jsonl`) logs vs structured Parquet arrays for large automated multi-run experiment sweeps.

@@ -104,3 +104,49 @@ This document records the architectural decisions made for the Titan project. Ea
 - **Consequences**:
   - *Positive*: Zero operational dependencies; experiments run locally in milliseconds with deterministic process control. We observe the execution policy rather than third-party broker queuing algorithms.
   - *Negative*: Task queues cannot scale across physically separate servers without networking extensions.
+
+---
+
+## ADR-008: At-Least-Once Processing and Rejection of Exactly-Once Execution Claims
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: Milestone 3 implements failure recovery when a worker disappears while executing a job. In distributed systems literature, systems frequently conflate "at-least-once processing", "effectively-once processing", and "exactly-once execution".
+- **Decision**:
+  1. Titan implements **at-least-once processing semantics**. When a worker dies, in-flight jobs are requeued and re-executed. A job's computation may physically execute more than once across failures.
+  2. Titan enforces **at-most-one final successful result** per unique job ID at the coordinator via idempotent deduplication. Stale or duplicate results arriving from previous attempts are safely discarded.
+  3. Titan explicitly **rejects** claiming "exactly-once execution" or "exactly-once processing". In any distributed crash-stop model with non-transactional external computation, true exactly-once physical execution is impossible.
+- **Consequences**:
+  - *Positive*: High scientific and engineering precision; prevents misleading claims; guarantees auditable state transitions without hidden edge-case anomalies.
+  - *Negative*: Workloads that produce external side-effects must be idempotent, as an attempt may partially or completely execute before an acknowledgment failure causes a retry.
+
+---
+
+## ADR-009: In-Flight Job Ownership Tracking and Deterministic Worker Failure Recovery
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: To recover work when a worker dies, the system must know which jobs were held by that worker without relying merely on inspecting whether the queue is empty.
+- **Decision**:
+  1. Introduce explicit ownership tracking: workers emit a `JobAcquired` event immediately upon dequeuing a job.
+  2. The coordinator maintains an in-flight mapping (`_in_flight[worker_id][job_id] = Job`).
+  3. The coordinator uses native OS process monitoring (`process.is_alive()` and `process.exitcode`) to detect process termination.
+  4. When a dead worker is detected, all uncompleted jobs registered in `_in_flight[worker_id]` are requeued with an incremented attempt counter ($attempt + 1$) up to `max_retries`.
+  5. Provide deterministic CLI failure injection (`--kill-worker` and `--kill-after-jobs`) invoking real OS process termination (`os._exit(42)`).
+- **Consequences**:
+  - *Positive*: Completely deterministic, observable failure recovery; zero polling timeouts required to infer process death; strict terminal accounting invariant (`completed + failed == submitted`).
+  - *Negative*: Requires bidirectional messaging over the event queue for acquisition and completion.
+
+---
+
+## ADR-010: Capacity-Restoring Worker Replacement vs. Dynamic Scaling
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Context**: When a worker process terminates, surviving workers can continue processing the queue, but available system concurrency is reduced.
+- **Decision**:
+  1. The coordinator optionally spawns a replacement worker process (e.g. `worker-X-r1`) upon worker termination to restore active concurrency back to the configured capacity (`num_workers`).
+  2. Worker replacement is strictly a **capacity restoration mechanism**, not an adaptive or dynamic autoscaler. The target concurrency remains fixed at the static baseline parameter.
+- **Consequences**:
+  - *Positive*: Prevents starvation when worker count is small (e.g. 1 worker); ensures long benchmarks maintain consistent processing capacity after an injected failure.
+  - *Negative*: Incurs OS process creation overhead on `spawn` platforms when a worker dies.

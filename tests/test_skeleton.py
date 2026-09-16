@@ -69,7 +69,7 @@ class TestTitanSkeleton(unittest.TestCase):
         output = stdout_capture.getvalue()
         self.assertIn("Titan Research Platform", output)
         self.assertIn("0.1.0", output)
-        self.assertIn("Milestone:   2 (Static Baseline Runtime)", output)
+        self.assertIn("Milestone:   3 (Failure Injection + Recovery)", output)
 
     def test_cli_status_json(self) -> None:
         """Verify the machine-readable JSON status subcommand output."""
