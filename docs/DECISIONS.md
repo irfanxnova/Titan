@@ -150,3 +150,37 @@ This document records the architectural decisions made for the Titan project. Ea
 - **Consequences**:
   - *Positive*: Prevents starvation when worker count is small (e.g. 1 worker); ensures long benchmarks maintain consistent processing capacity after an injected failure.
   - *Negative*: Incurs OS process creation overhead on `spawn` platforms when a worker dies.
+
+---
+
+## ADR-011: Strict Separation of Logical Job Identity from Execution Attempt Identity
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: In initial prototypes, `Job` held an internal `attempt` counter, effectively conflating the logical unit of work with physical execution attempts. In distributed systems failure analysis and replay, a single logical task may undergo multiple executions across distinct workers and time intervals. Conflating these concepts prevents clean event tracing, provenance tracking, and divergence analysis.
+- **Decision**:
+  1. Formally separate `Job` (the stable logical unit of work, identified by `job_id`) from `ExecutionAttempt` (a concrete physical execution, uniquely identified by `AttemptKey = (job_id, attempt_id)`).
+  2. A retry must never reuse an earlier attempt identity; every retry instantiates a brand new `ExecutionAttempt` with an incremented sequential `attempt_id`.
+  3. Workers execute `ExecutionAttempt` instances and report attempt-level results, without authority over logical job state.
+- **Consequences**:
+  - *Positive*: Unambiguous attempt identity; transparent provenance of which worker executed which attempt; foundational substrate for future trace recording and deterministic replay.
+  - *Negative*: Slightly more dataclasses and state mappings in coordinator memory.
+
+---
+
+## ADR-012: Explicit Attempt Lifecycle and Coordinator-Authoritative Deduplication
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: When workers fail or network delays occur, late results from earlier attempts may arrive after a subsequent retry has already completed or is currently active. The coordinator must prevent state corruption, race conditions, or duplicate side effects.
+- **Decision**:
+  1. Define explicit attempt lifecycle states: `CREATED`, `ASSIGNED`, `RUNNING`, `COMPLETED`, `FAILED`, `LOST`, `RETRY_PENDING`.
+  2. Maintain unambiguous worker ownership at the coordinator (`_attempt_ownership[AttemptKey] = worker_id`). When a worker dies, ownership is revoked immediately, and the attempt is marked `LOST`.
+  3. Enforce coordinator authority over logical job outcomes (`JobStatus`):
+     - **Valid Completion**: Current active attempt finishes; transitions job to `COMPLETED`.
+     - **Duplicate Completion**: Repeated arrival for an already-completed job; safely ignored.
+     - **Stale Completion**: Arrival from an older superseded attempt (e.g., attempt 1 arrives after attempt 2 completed or became active); safely ignored.
+- **Consequences**:
+  - *Positive*: Elimination of duplicate completion anomalies; deterministic accounting; robust to worker death and out-of-order event delivery.
+  - *Negative*: Requires coordinator to maintain historical attempt indices per job.
+

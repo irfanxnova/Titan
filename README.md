@@ -31,14 +31,20 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime**, featuring in-
   - Strict terminal accounting invariant: $\text{completed\_unique} + \text{failed\_unique} == \text{total\_unique\_submitted}$.
 - **Deterministic Failure Injection (`src/titan/cli.py`, `src/titan/worker.py`)**:
   - Deterministic CLI flags: `--kill-worker <ID>` and `--kill-after-jobs <N>` trigger real OS process exits (`os._exit(42)`).
-- **Worker Replacement (`src/titan/runtime.py`)**:
-  - Automatically spawns replacement workers (e.g. `worker-0-r1`) to restore active worker pool capacity back to the configured count.
+- **Explicit Execution Model (`src/titan/job.py`, `src/titan/runtime.py`)**:
+  - Clear separation between logical jobs (`Job`) and concrete physical executions (`ExecutionAttempt`).
+  - Distinguishable composite attempt identity: `AttemptKey = (job_id, attempt_id)`.
+  - Attempt lifecycle tracking (`AttemptStatus`): `CREATED`, `ASSIGNED`, `RUNNING`, `COMPLETED`, `FAILED`, `LOST`, `RETRY_PENDING`.
+  - Authoritative coordinator ownership registry: `_attempt_ownership[AttemptKey] = worker_id`.
+  - Robust deduplication distinguishing valid, duplicate, and stale completions.
+- **Worker Replacement & Entity Tracking (`src/titan/runtime.py`)**:
+  - Automatically spawns replacement workers (e.g. `worker-0-r1`) with distinct identities while preserving historical records (`WorkerRecord`).
 - **Recovery Telemetry Subsystem (`src/titan/metrics.py`)**:
   - Computes wall-clock time, primary throughput (unique jobs/sec), attempt throughput, worker failures, retries, recovered jobs, permanently failed jobs, duplicate results ignored, and recovery duration.
 - **Authoritative Documentation**:
   - [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md): Non-negotiable principles, research scope, and non-goals.
-  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, failure recovery semantics, and limitations.
-  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-010, including ADR-008 rejecting exactly-once execution claims).
+  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, and limitations.
+  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-012, including ADR-011 on job/attempt separation and ADR-012 on attempt lifecycle).
   - [EXPERIMENTS.md](docs/EXPERIMENTS.md): Formal protocol template and completed trials for EXP-002.
 
 ### What Does NOT Exist Yet (Intentionally Unimplemented)

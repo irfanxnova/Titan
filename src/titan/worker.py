@@ -7,7 +7,7 @@ import time
 from multiprocessing import Queue
 from typing import Any
 
-from titan.job import Job, JobAcquired, JobResult, JobStatus
+from titan.job import ExecutionAttempt, Job, JobAcquired, JobResult, JobStatus
 from titan.workload import execute_workload
 
 
@@ -20,15 +20,16 @@ def worker_process_main(
 ) -> None:
     """Main execution loop for an individual worker OS process.
 
-    Continuously acquires jobs from job_queue, reports acquisition for in-flight
-    ownership tracking, executes the workload, and posts results to event_queue.
-    Supports deterministic failure injection via immediate OS process exit.
+    Continuously acquires execution attempts from job_queue, reports acquisition
+    for in-flight ownership tracking, executes the workload, and posts results
+    to event_queue. Supports deterministic failure injection via immediate OS
+    process exit.
     """
     completed_jobs_count = 0
 
     while True:
         try:
-            job: Job | None = job_queue.get()
+            job: ExecutionAttempt | Job | None = job_queue.get()
         except (EOFError, KeyboardInterrupt):
             break
 
@@ -37,12 +38,13 @@ def worker_process_main(
             break
 
         acquired_at = time.perf_counter()
+        attempt_id = getattr(job, "attempt_id", getattr(job, "attempt", 1))
 
         # Step 1: Immediately emit acquisition event for in-flight ownership tracking
         acquisition = JobAcquired(
             job_id=job.job_id,
             worker_id=worker_id,
-            attempt=job.attempt,
+            attempt_id=attempt_id,
             acquired_at=acquired_at,
         )
         try:
@@ -76,7 +78,7 @@ def worker_process_main(
                 job_id=job.job_id,
                 worker_id=worker_id,
                 status=JobStatus.COMPLETED,
-                attempt=job.attempt,
+                attempt_id=attempt_id,
                 submitted_at=job.created_at,
                 started_at=started_at,
                 completed_at=completed_at,
@@ -94,7 +96,7 @@ def worker_process_main(
                 job_id=job.job_id,
                 worker_id=worker_id,
                 status=JobStatus.FAILED,
-                attempt=job.attempt,
+                attempt_id=attempt_id,
                 submitted_at=job.created_at,
                 started_at=started_at,
                 completed_at=completed_at,

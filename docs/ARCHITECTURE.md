@@ -55,30 +55,55 @@ As of Milestone 3, the confirmed architecture consists of the **Failure-Aware Mu
   2. *Intentional Test Failure Injection*: Triggered by CLI flags (`--kill-worker` and `--kill-after-jobs`); worker executes an immediate OS-level exit via `os._exit(42)`.
   3. *Unexpected Worker Termination*: Unplanned process crash or signal termination (`exitcode != 0` and `exitcode != 42` during active run).
 
-### 1.2 In-Flight Work Ownership Tracking
-- To answer the critical recovery question: *"Which jobs were assigned to worker X and had not produced a final result when X died?"*, workers emit an immediate `JobAcquired` event to `event_queue` prior to starting computation.
-- The coordinator maintains an in-memory ownership registry: `_in_flight[worker_id][job_id] = Job`.
-- When a worker dies, the coordinator scans `_in_flight[worker_id]` to identify all uncompleted jobs owned by that worker for immediate recovery.
+### 1.2 Execution Model: Logical Jobs vs. Execution Attempts
+Titan strictly distinguishes between a **logical job** and a **concrete execution attempt**:
+```
+Logical Job (stable job_id)
+       │
+       ├── Attempt 1 (AttemptKey = (job_id, 1)) ──> Worker W1 ──> worker failure (LOST)
+       │
+       ├── Attempt 2 (AttemptKey = (job_id, 2)) ──> Worker W2 ──> completes (COMPLETED)
+       │
+       └── Logical Job Terminal Outcome: COMPLETED
+```
 
-### 1.3 At-Least-Once Processing & Deduplication Semantics
-- **At-Least-Once Execution**: If a worker terminates mid-job, the job is requeued and re-executed by a surviving or replacement worker. A job may therefore be executed more than once across failures.
-- **Result Deduplication**: The coordinator enforces that each unique `job_id` has **at most one final successful result** recorded.
-- **Stale Result Suppression**: If an earlier slow or presumed-lost attempt eventually deposits a result after a subsequent retry has already succeeded, the coordinator discards the stale result and records it as an ignored duplicate (`duplicate_results_ignored`).
-- **Terminal Accounting Invariant**: At the end of execution, the accounting invariant strictly holds:
+- **Logical Job (`Job`)**:
+  - A unit of work with a stable identity (`job_id`) that never mutates across retries.
+  - Represents the authoritative task submitted by the producer.
+  - Lifecycle states (`JobStatus`): `PENDING`, `RUNNING`, `RETRY_PENDING`, `COMPLETED`, `FAILED`.
+- **Execution Attempt (`ExecutionAttempt`)**:
+  - A concrete physical execution of a logical job.
+  - Has an explicit, composite identity: `AttemptKey = (job_id, attempt_id)`.
+  - Attempts are **never collapsed** into the logical job identity.
+  - Lifecycle states (`AttemptStatus`): `CREATED`, `ASSIGNED`, `RUNNING`, `COMPLETED`, `FAILED`, `LOST`, `RETRY_PENDING`.
+- **Worker Entity (`WorkerRecord`)**:
+  - Stable worker identity (e.g. `worker-0`).
+  - When replacement is enabled, a replacement worker receives a new distinct identity (e.g. `worker-0-r1`). The historical record of the original failed worker is permanently preserved.
+
+### 1.3 In-Flight Work Ownership & State Transitions
+- **Unambiguous Ownership**: At any point where an attempt is executing, the coordinator maintains an authoritative mapping: `_attempt_ownership[AttemptKey] = worker_id`.
+- **Acquisition Event**: Workers emit `JobAcquired(job_id, worker_id, attempt_id, acquired_at)` immediately upon dequeuing. This transitions the attempt to `RUNNING` and establishes worker ownership.
+- **Worker Termination & Recovery**:
+  1. Worker process crashes or exits abruptly (`process.is_alive() == False`).
+  2. Coordinator revokes ownership of all in-flight attempts held by that worker (`_attempt_ownership.pop(AttemptKey)`).
+  3. Affected attempts transition to `AttemptStatus.LOST`.
+  4. If $attempt\_id < max\_retries$, the logical job transitions to `JobStatus.RETRY_PENDING` and a brand new attempt ($attempt\_id + 1$) is instantiated with `AttemptStatus.CREATED` and placed onto `job_queue`.
+  5. If retries are exhausted, the logical job transitions to terminal `JobStatus.FAILED`.
+
+### 1.4 At-Least-Once Processing & Coordinator Deduplication
+- **At-Least-Once Execution**: Computation may physically execute more than once across failures.
+- **Coordinator-Authoritative Terminal State**: Workers report attempt outcomes (`JobResult`); the coordinator alone determines logical job completion.
+- **Deduplication Categories (`CompletionCategory`)**:
+  1. *Valid Completion (`VALID`)*: A completion for the currently active attempt that transitions the logical job to `COMPLETED`.
+  2. *Duplicate Completion (`DUPLICATE`)*: Repeated arrival of a result for an already-completed job attempt. Suppressed without side effects.
+  3. *Stale Completion (`STALE`)*: Late arrival of a result from an older superseded attempt (e.g., Attempt 1 arrives after Attempt 2 completed or was dispatched). Safely discarded without modifying terminal state.
+- **Terminal Accounting Invariant**:
   $$\text{completed\_unique} + \text{failed\_unique} == \text{total\_unique\_submitted}$$
 
-### 1.4 Retry Policy & Job Lifecycle
-- **Configurable Retry Ceiling**: Configured via `--max-retries` (default: 3).
-- **Lifecycle States**:
-  1. `PENDING`: Enqueued and awaiting acquisition.
-  2. `RUNNING`: Acquired by a worker; in-flight ownership established.
-  3. `REQUEUED`: Worker died while job was in-flight; attempt counter incremented ($attempt < max\_retries$) and job placed back onto `job_queue`.
-  4. `COMPLETED`: Workload successfully executed and acknowledged by the coordinator.
-  5. `FAILED`: Max retries exceeded without successful completion, or unrecoverable error.
-
-### 1.5 Worker Replacement
-- When a worker dies, the coordinator spawns a replacement worker process (e.g. `worker-X-r1`) to restore the active worker pool back to the statically configured capacity (`--workers`).
-- Worker replacement restores lost capacity; it does not dynamically scale or adapt worker counts based on load.
+### 1.5 Worker Replacement & Identity Semantics
+- When a worker process terminates, the coordinator spawns a replacement worker process (e.g. `worker-0-r1`) to restore active pool capacity back to `--workers`.
+- **Identity Distinction**: The replacement worker receives a new, distinct worker identity. The historical identity and lifecycle of the failed worker remain intact in `WorkerRecord`.
+- Worker replacement is strictly a capacity restoration mechanism, not an autoscaler.
 
 ### 1.6 Metrics & Telemetry
 - Implemented in `src/titan/metrics.py`.
