@@ -184,3 +184,21 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Elimination of duplicate completion anomalies; deterministic accounting; robust to worker death and out-of-order event delivery.
   - *Negative*: Requires coordinator to maintain historical attempt indices per job.
 
+---
+
+## ADR-013: Deterministic Scenario and Fault-Injection Layer
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestone 3 requires reliably reproducing specific distributed execution and failure situations for automated testing and comparative evaluation. Stochastic or uncoordinated failure injection creates flaky experiments and undermines scientific auditability. Furthermore, embedding scenario generation directly into coordinator logic would couple experimental setups with core runtime mechanics.
+- **Decision**:
+  1. Isolate scenario definitions and workload generators in a dedicated module (`src/titan/scenario.py`), completely separate from `StaticRuntime`.
+  2. Implement `Scenario` as an immutable configuration supporting deterministic patterns (`uniform`, `linear`, `bimodal`) and seeded repeatability.
+  3. Implement `FaultConfig` for deterministic worker failure injection triggered at an exact completion threshold (`kill_after_jobs`) or target job (`target_job_id`) via real process termination (`os._exit(42)`). Fault injection is disabled by default.
+  4. Perform strict upfront validation of fault targets and parameters prior to execution, failing fast rather than partially executing.
+  5. Provide first-class CLI support (`--scenario`, `--pattern`, `--seed`) while maintaining 100% backward compatibility with existing CLI arguments.
+- **Consequences**:
+  - *Positive*: Perfect reproducibility across test runs; clear separation between experimental scenarios and runtime mechanics; rich observability payloads without polluting authoritative job domain models.
+  - *Negative*: Scenarios are limited to deterministic single-node process crash-stop failures at this stage; networked partition scenarios remain for future milestones.
+
+

@@ -15,8 +15,13 @@ if _src_dir not in sys.path:
 
 from titan import __version__
 from titan.config import TitanConfig
-from titan.job import Job
-from titan.runtime import FailureConfig, StaticRuntime
+from titan.scenario import (
+    PREDEFINED_SCENARIOS,
+    FaultConfig,
+    Scenario,
+    get_scenario,
+    run_scenario,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,30 +57,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute a workload using the static multi-process runtime with failure injection.",
     )
     run_parser.add_argument(
+        "--scenario",
+        "-s",
+        type=str,
+        default=None,
+        help="Named deterministic scenario to run (e.g. 'baseline', 'worker-crash', 'stress-recovery').",
+    )
+    run_parser.add_argument(
         "--workers",
         "-w",
         type=int,
-        default=2,
+        default=None,
         help="Number of worker processes to spawn (e.g. 1, 2, 4, 8). Default: 2.",
     )
     run_parser.add_argument(
         "--jobs",
         "-j",
         type=int,
-        default=100,
+        default=None,
         help="Total number of unique jobs to submit. Default: 100.",
     )
     run_parser.add_argument(
         "--work-units",
         "-u",
         type=int,
-        default=1000,
+        default=None,
         help="Deterministic computation units per job. Default: 1000.",
+    )
+    run_parser.add_argument(
+        "--pattern",
+        type=str,
+        default="uniform",
+        choices=["uniform", "linear", "bimodal"],
+        help="Workload distribution pattern ('uniform', 'linear', 'bimodal'). Default: uniform.",
+    )
+    run_parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Deterministic random seed for workload generation. Default: 42.",
     )
     run_parser.add_argument(
         "--max-retries",
         type=int,
-        default=3,
+        default=None,
         help="Maximum retry attempts per job upon worker failure. Default: 3.",
     )
     run_parser.add_argument(
@@ -123,6 +148,7 @@ def handle_status(json_output: bool = False) -> int:
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
+            "scenarios": list(PREDEFINED_SCENARIOS.keys()),
         }
         print(json.dumps(data, indent=2))
     else:
@@ -132,33 +158,54 @@ def handle_status(json_output: bool = False) -> int:
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
         print("  State:       Operational (Failure Recovery Active)")
+        print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
 
     return 0
 
 
 def handle_run(
-    workers: int,
-    jobs_count: int,
-    work_units: int,
-    max_retries: int,
+    workers: int | None,
+    jobs_count: int | None,
+    work_units: int | None,
+    max_retries: int | None,
     kill_worker: str | None,
     kill_after_jobs: int | None,
     no_replace_workers: bool,
     timeout: float | None,
     json_output: bool,
+    scenario_name: str | None = None,
+    pattern: str = "uniform",
+    seed: int = 42,
 ) -> int:
     """Execute a workload batch and output verified performance and recovery metrics."""
-    if workers < 1:
-        print(f"Error: --workers must be at least 1, got {workers}", file=sys.stderr)
+    # Resolve scenario preset if specified
+    preset: Scenario | None = None
+    if scenario_name is not None:
+        try:
+            preset = get_scenario(scenario_name)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+    # Effective parameter resolution (CLI explicit flags override scenario defaults)
+    effective_workers = workers if workers is not None else (preset.num_workers if preset else 2)
+    effective_jobs = jobs_count if jobs_count is not None else (preset.num_jobs if preset else 100)
+    effective_work_units = work_units if work_units is not None else (preset.work_units if preset else 1000)
+    effective_max_retries = max_retries if max_retries is not None else (preset.max_retries if preset else 3)
+    effective_timeout = timeout if timeout is not None else (preset.timeout if preset else None)
+
+    # Basic parameter validation
+    if effective_workers < 1:
+        print(f"Error: --workers must be at least 1, got {effective_workers}", file=sys.stderr)
         return 1
-    if jobs_count < 0:
-        print(f"Error: --jobs cannot be negative, got {jobs_count}", file=sys.stderr)
+    if effective_jobs < 0:
+        print(f"Error: --jobs cannot be negative, got {effective_jobs}", file=sys.stderr)
         return 1
-    if work_units < 1:
-        print(f"Error: --work-units must be at least 1, got {work_units}", file=sys.stderr)
+    if effective_work_units < 1:
+        print(f"Error: --work-units must be at least 1, got {effective_work_units}", file=sys.stderr)
         return 1
-    if max_retries < 1:
-        print(f"Error: --max-retries must be at least 1, got {max_retries}", file=sys.stderr)
+    if effective_max_retries < 1:
+        print(f"Error: --max-retries must be at least 1, got {effective_max_retries}", file=sys.stderr)
         return 1
     if kill_after_jobs is not None and kill_after_jobs < 0:
         print(f"Error: --kill-after-jobs cannot be negative, got {kill_after_jobs}", file=sys.stderr)
@@ -167,38 +214,46 @@ def handle_run(
         print("Error: --kill-after-jobs requires --kill-worker to be specified", file=sys.stderr)
         return 1
 
-    failure_config: FailureConfig | None = None
+    # Fault configuration resolution
+    fault_config: FaultConfig | None = None
     if kill_worker is not None:
-        target_id = kill_worker if kill_worker.startswith("worker-") else f"worker-{kill_worker}"
         threshold = kill_after_jobs if kill_after_jobs is not None else 0
-        failure_config = FailureConfig(target_worker_id=target_id, kill_after_jobs=threshold)
+        fault_config = FaultConfig(target_worker_id=kill_worker, kill_after_jobs=threshold)
+    elif preset and preset.fault_config:
+        fault_config = preset.fault_config
 
-    jobs = [
-        Job.create(job_id=f"job-{i:06d}", work_units=work_units, max_retries=max_retries)
-        for i in range(jobs_count)
-    ]
-
-    runtime = StaticRuntime(
-        num_workers=workers,
-        max_retries=max_retries,
-        replace_failed_workers=not no_replace_workers,
-        failure_config=failure_config,
-    )
     try:
-        metrics, _ = runtime.run_workload(jobs, timeout=timeout)
-    finally:
-        runtime.stop()
+        scenario = Scenario(
+            name=scenario_name or (preset.name if preset else "custom"),
+            num_workers=effective_workers,
+            num_jobs=effective_jobs,
+            work_units=effective_work_units,
+            pattern=pattern or (preset.pattern if preset else "uniform"),
+            seed=seed,
+            max_retries=effective_max_retries,
+            replace_failed_workers=not no_replace_workers,
+            fault_config=fault_config,
+            timeout=effective_timeout,
+        )
+        scenario.validate()
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    scenario_result = run_scenario(scenario)
+    metrics = scenario_result.metrics
 
     if json_output:
         payload = {
+            "scenario": scenario_result.to_dict()["scenario"],
             "config": {
-                "workers": workers,
-                "jobs": jobs_count,
-                "work_units": work_units,
-                "max_retries": max_retries,
-                "kill_worker": failure_config.target_worker_id if failure_config else None,
-                "kill_after_jobs": failure_config.kill_after_jobs if failure_config else None,
-                "replace_workers": not no_replace_workers,
+                "workers": scenario.num_workers,
+                "jobs": scenario.num_jobs,
+                "work_units": scenario.work_units,
+                "max_retries": scenario.max_retries,
+                "kill_worker": scenario.fault_config.target_worker_id if scenario.fault_config else None,
+                "kill_after_jobs": scenario.fault_config.kill_after_jobs if scenario.fault_config else None,
+                "replace_workers": scenario.replace_failed_workers,
             },
             "metrics": metrics.to_dict(),
         }
@@ -207,7 +262,12 @@ def handle_run(
         print("=" * 66)
         print("Titan Runtime Execution & Recovery Report")
         print("=" * 66)
-        print(f"  Worker Processes:              {workers}")
+        print(f"  Scenario:                      {scenario.name}")
+        if scenario.fault_config:
+            print(f"  Fault Injection:               Active ({scenario.fault_config.target_worker_id} killed after {scenario.fault_config.kill_after_jobs} jobs)")
+        else:
+            print("  Fault Injection:               Disabled")
+        print(f"  Worker Processes:              {scenario.num_workers}")
         print(f"  Jobs Submitted (Unique):       {metrics.total_unique_submitted}")
         print(f"  Total Execution Attempts:      {metrics.total_execution_attempts}")
         print(f"  Jobs Completed (Unique):       {metrics.total_completed_unique}")
@@ -253,6 +313,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             no_replace_workers=args.no_replace_workers,
             timeout=args.timeout,
             json_output=args.json,
+            scenario_name=args.scenario,
+            pattern=args.pattern,
+            seed=args.seed,
         )
 
     parser.print_help()

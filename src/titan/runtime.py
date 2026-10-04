@@ -35,6 +35,7 @@ class FailureConfig:
 
     target_worker_id: str
     kill_after_jobs: int
+    target_job_id: str | None = None
 
 
 class StaticRuntime:
@@ -186,13 +187,15 @@ class StaticRuntime:
             worker_id = f"worker-{i}"
             fail_target = None
             kill_after = None
+            target_job = None
             if self.failure_config and self.failure_config.target_worker_id == worker_id:
                 fail_target = self.failure_config.target_worker_id
                 kill_after = self.failure_config.kill_after_jobs
+                target_job = self.failure_config.target_job_id
 
             process = self._ctx.Process(
                 target=worker_process_main,
-                args=(worker_id, self._job_queue, self._event_queue, fail_target, kill_after),
+                args=(worker_id, self._job_queue, self._event_queue, fail_target, kill_after, target_job),
                 name=f"TitanWorker-{worker_id}",
                 daemon=True,
             )
@@ -256,7 +259,7 @@ class StaticRuntime:
         new_worker_id = f"{dead_worker_id}-r{self._replacement_counter}"
         process = self._ctx.Process(
             target=worker_process_main,
-            args=(new_worker_id, self._job_queue, self._event_queue, None, None),
+            args=(new_worker_id, self._job_queue, self._event_queue, None, None, None),
             name=f"TitanWorker-{new_worker_id}",
             daemon=True,
         )

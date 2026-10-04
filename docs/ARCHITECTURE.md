@@ -112,7 +112,26 @@ Logical Job (stable job_id)
 - **Recovery Duration**: Elapsed time from the detection of the first worker failure until all recovered jobs reach terminal state.
 - **Failure Telemetry**: Tracks `worker_failures`, `jobs_recovered`, `jobs_permanently_failed`, `total_retries`, and `duplicate_results_ignored`.
 
-### 1.7 Known Limitations of Milestone 3
+### 1.7 Deterministic Scenario & Fault-Injection System
+Implemented in `src/titan/scenario.py`:
+- **Scenario Abstraction (`Scenario`)**:
+  - Encapsulates a repeatable test configuration: `name`, `num_workers`, `num_jobs`, `work_units`, `pattern` (`uniform`, `linear`, `bimodal`), `seed`, `max_retries`, `replace_failed_workers`, `fault_config`, and `timeout`.
+  - Fully decoupled from core coordinator logic. The scenario generates deterministic sequences of logical `Job` instances and executes them against the runtime.
+  - Predefined named presets: `baseline` (normal execution), `worker-crash` (injected crash of worker-0), and `stress-recovery` (concurrency stress with recovery).
+- **Deterministic Fault Injection (`FaultConfig`)**:
+  - Explicitly targets a specific worker entity (`target_worker_id`) and trigger point (`kill_after_jobs` threshold or `target_job_id`).
+  - Disabled by default.
+  - Strict pre-execution validation: bounds-checks worker indices, enforces non-negative thresholds, and prevents thresholds exceeding total job count.
+  - Triggered synchronously inside the target worker process mid-execution via `os._exit(42)`.
+- **System Guarantees**:
+  - *Repeatability*: Identical scenario parameters and seed produce identical job payloads, identical failure points, and identical terminal outcomes.
+  - *Provenance & Observability*: Scenario metadata and fault status are reported alongside metrics without mixing scenario data into authoritative `Job` or `ExecutionAttempt` records.
+- **Intentional Milestone Boundaries**:
+  - No random/unseeded packet loss or stochastic clock drift.
+  - No Byzantine fault models or network split-brain simulations.
+  - No external orchestrators or distributed log persistence.
+
+### 1.8 Known Limitations of Milestone 3
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory. A crash of the coordinator process loses all state (persistent distributed logs are not yet implemented).
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
 - **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.

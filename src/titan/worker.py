@@ -17,6 +17,7 @@ def worker_process_main(
     event_queue: Queue[Any],
     failure_target: str | None = None,
     kill_after_jobs: int | None = None,
+    target_job_id: str | None = None,
 ) -> None:
     """Main execution loop for an individual worker OS process.
 
@@ -53,14 +54,22 @@ def worker_process_main(
             break
 
         # Step 2: Deterministic failure injection check
-        # If this worker is the configured target and has reached the kill threshold,
-        # terminate the process abruptly mid-job without reporting completion.
-        if (
+        # If this worker is the configured target and has reached the kill threshold
+        # (or encountered the specified target job), terminate abruptly mid-job.
+        trigger_by_count = (
             failure_target is not None
             and failure_target == worker_id
             and kill_after_jobs is not None
             and completed_jobs_count == kill_after_jobs
-        ):
+        )
+        trigger_by_job = (
+            failure_target is not None
+            and failure_target == worker_id
+            and target_job_id is not None
+            and job.job_id == target_job_id
+        )
+
+        if trigger_by_count or trigger_by_job:
             # Give background queue feeder thread a brief slice to transfer to OS pipe
             time.sleep(0.02)
             # Real OS process termination with non-zero exit code (42)

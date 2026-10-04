@@ -31,6 +31,11 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime**, featuring in-
   - Strict terminal accounting invariant: $\text{completed\_unique} + \text{failed\_unique} == \text{total\_unique\_submitted}$.
 - **Deterministic Failure Injection (`src/titan/cli.py`, `src/titan/worker.py`)**:
   - Deterministic CLI flags: `--kill-worker <ID>` and `--kill-after-jobs <N>` trigger real OS process exits (`os._exit(42)`).
+- **Deterministic Scenario & Fault-Injection System (`src/titan/scenario.py`)**:
+  - Repeatable workload and failure scenario definitions (`Scenario`, `FaultConfig`, `ScenarioResult`).
+  - Strict input validation preventing out-of-range targets or partial execution.
+  - Workload distribution patterns: `uniform`, `linear`, and seeded `bimodal`.
+  - Standard presets: `baseline` (normal execution), `worker-crash` (injected crash of worker-0), and `stress-recovery` (concurrency stress with recovery).
 - **Explicit Execution Model (`src/titan/job.py`, `src/titan/runtime.py`)**:
   - Clear separation between logical jobs (`Job`) and concrete physical executions (`ExecutionAttempt`).
   - Distinguishable composite attempt identity: `AttemptKey = (job_id, attempt_id)`.
@@ -44,7 +49,7 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime**, featuring in-
 - **Authoritative Documentation**:
   - [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md): Non-negotiable principles, research scope, and non-goals.
   - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, and limitations.
-  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-012, including ADR-011 on job/attempt separation and ADR-012 on attempt lifecycle).
+  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-013, including ADR-011 on job/attempt separation, ADR-012 on attempt lifecycle, and ADR-013 on deterministic scenarios).
   - [EXPERIMENTS.md](docs/EXPERIMENTS.md): Formal protocol template and completed trials for EXP-002.
 
 ### What Does NOT Exist Yet (Intentionally Unimplemented)
@@ -72,7 +77,7 @@ Deduplication & Accounting <----------------------------+
 1. **Submission**: Coordinator enqueues immutable `Job` records.
 2. **Acquisition**: Worker grabs job, emits `JobAcquired` event, establishing coordinator in-flight ownership.
 3. **Execution**: Worker computes deterministic workload and posts `JobResult`.
-4. **Failure Injection**: If configured (`--kill-worker`, `--kill-after-jobs`), worker triggers `os._exit(42)` mid-job.
+4. **Failure Injection**: If configured (`--kill-worker`, `--kill-after-jobs`, or `--scenario worker-crash`), target worker triggers `os._exit(42)` mid-job.
 5. **Detection & Recovery**: Coordinator detects dead worker, scans `_in_flight[worker_id]`, increments attempt count, and requeues uncompleted jobs onto `job_queue`.
 6. **Worker Replacement**: Coordinator spawns a replacement worker to restore configured concurrency.
 7. **Deduplication**: If a duplicate or stale result arrives from an earlier attempt, it is discarded without inflating completed counts.
@@ -85,29 +90,35 @@ Deduplication & Accounting <----------------------------+
 - Python 3.10 or later
 - Standard library modules (zero external dependencies)
 
-### Running Baseline Workload (No Failures)
+### Running Predefined Scenarios
+Run baseline execution (2 workers, 20 jobs, no failures):
 ```powershell
-python src/titan/cli.py run --workers 4 --jobs 100 --work-units 2000
+python src/titan/cli.py run --scenario baseline
 ```
 
-### Running Workload with Deterministic Worker Failure & Recovery
-Kill worker 2 after it completes 5 jobs:
+Run deterministic worker crash and recovery scenario:
+```powershell
+python src/titan/cli.py run --scenario worker-crash
+```
+
+Run stress recovery scenario formatted as JSON:
+```powershell
+python src/titan/cli.py run --scenario stress-recovery --json
+```
+
+### Running Custom Workloads & Fault Injection
+Execute a custom workload with deterministic failure injection:
 ```powershell
 python src/titan/cli.py run --workers 4 --jobs 100 --work-units 2000 --kill-worker 2 --kill-after-jobs 5
 ```
 
-Inspect recovery telemetry formatted as JSON:
-```powershell
-python src/titan/cli.py run --workers 4 --jobs 50 --work-units 2000 --kill-worker 1 --kill-after-jobs 5 --json
-```
-
-Check platform status:
+Check platform status and available scenario presets:
 ```powershell
 python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 26-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 53-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```
