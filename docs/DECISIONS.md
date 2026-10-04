@@ -228,5 +228,33 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Enables exact, deterministic reconstruction of execution history, failure points, and retry flows; clean separation of concerns; provides foundation for future replay and failure analysis milestones.
   - *Negative*: Slight memory overhead for collecting event objects during large runs; addressed by lightweight dataclasses and optional collector resets.
 
+---
+
+## ADR-015: Deterministic Execution Trace Replay Engine
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestone 4 established canonical structured execution tracing (`TraceEvent`, `ExecutionTrace`). However, post-run failure analysis, anomaly detection, and empirical debugging require an authoritative mechanism to inspect previously captured traces and verify their internal logical consistency. Simply running arbitrary code again is non-deterministic and can produce different interleavings. An engine is needed that can reconstruct the exact logical execution history, check state invariants, and detect impossible transitions without side effects.
+- **Decision**:
+  1. Build a dedicated, observational replay engine (`ReplayEngine` in `src/titan/replay.py`) operating strictly over structured traces.
+  2. Implement an isolated, read-only replay state model (`ReplayState`, `ReplayWorkerState`, `ReplayJobState`, `ReplayAttemptState`) rather than reusing mutable runtime coordinator state.
+  3. Enforce strictly observational semantics: the replay engine never executes workload computation, never spawns worker processes, never invokes fault injection, does not modify traces, and does not depend on wall-clock time.
+  4. Enforce sequence numbers (`seq`) as the sole canonical ordering mechanism, completely ignoring timestamps for ordering decisions.
+  5. Validate authoritative lifecycle state transitions and detect corruptions:
+     - Strict sequence continuity ($seq_{k+1} == seq_k + 1$)
+     - Single run lifecycle bounds (`RUN_STARTED` at start, prohibition of job events after `RUN_COMPLETED`)
+     - Unknown job or worker detection
+     - Unassigned attempt starts or completions
+     - Illegal retries without preceding lost/failed attempts
+     - Reassignments without corresponding retries
+     - Duplicate terminal completions for attempts or jobs
+     - Worker replacement validity checks
+  6. Return a structured, JSON-serializable `ReplayResult` containing validation outcome (`valid`), reconstructed state summaries, failure/retry metrics, and diagnostic error lists.
+  7. Provide first-class CLI support via `python src/titan/cli.py replay <trace-file> [--json]`.
+- **Consequences**:
+  - *Positive*: Establishes a rock-solid, deterministic audit layer for execution history; enables offline verification of runs; provides the foundational tool for divergence detection and automated failure analysis in subsequent research milestones.
+  - *Negative*: Trace replay validates the logical sequence recorded in the trace, but cannot verify external state outside the captured trace schema.
+
+
 
 

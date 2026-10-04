@@ -6,7 +6,7 @@ This document serves as the architectural source of truth for Titan. It explicit
 
 ## 1. Confirmed Architecture
 
-As of Milestone 4, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing**:
+As of Milestone 5, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing and Deterministic Replay Engine**:
 
 ```
                                   [ Titan CLI ]
@@ -155,19 +155,55 @@ Implemented in `src/titan/trace.py`:
   - The runtime coordinator alone maintains authoritative state (`_job_states`, `_attempt_states`, `_attempt_ownership`, `_completed_jobs`).
   - Runtime scheduling, retries, deduplication, and termination decisions never read, query, or depend on the trace collector.
   - Normal execution proceeds identically whether a trace consumer is present, inspecting, or exporting the trace.
-- **Foundation for Future Replay & Failure Analysis**:
-  - The structured event trace preserves sufficient information to fully reconstruct:
-    - Complete job and attempt lifecycle trees.
-    - In-flight worker ownership at any point in logical time.
-    - Failure injection points, detection latency, and dead worker exit codes.
-    - Lost attempt recovery, retry instantiation, and reassignment to replacement workers.
-    - Terminal outcome metrics.
-  - This provides the auditable event log required by future milestones for deterministic execution replay, divergence detection, and failure analysis.
 
-### 1.9 Known Limitations of Milestone 4
-- **In-Memory IPC Queues**: Jobs and ownership state exist in memory. A crash of the coordinator process loses all state (persistent distributed logs are not yet implemented).
+### 1.9 Deterministic Replay Engine
+Implemented in `src/titan/replay.py`:
+- **Observational Replay Architecture**:
+  - Reconstructs and validates the logical execution history of a run strictly from its structured trace.
+  - **Zero Execution / Purely Observational**: Replay does *not* execute workload tasks, does *not* spawn OS worker processes, does *not* invoke fault injection, does *not* touch network or disk IPC queues, and has *no* dependency on wall-clock time.
+  - Replay is completely non-destructive: it never alters, mutates, or truncates the original trace.
+- **Dedicated Replay State Model**:
+  - Completely decoupled from mutable runtime state (`StaticRuntime`).
+  - Represents reconstructed state entities:
+    - `ReplayState`: Root state tracking run status, workers, jobs, attempts, in-flight ownership, and counts.
+    - `ReplayRunStatus`: `NOT_STARTED`, `RUNNING`, `COMPLETED`.
+    - `ReplayWorkerState`: Worker entity lifecycle (`IDLE`, `BUSY`, `FAILED`, `EXITED`, `REPLACED`) and assignment counters.
+    - `ReplayJobState`: Logical job lifecycle (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `LOST`, `RETRY_PENDING`).
+    - `ReplayAttemptState`: Concrete attempt lifecycle, owning worker, and terminal outcomes.
+- **Deterministic Ordering**:
+  - Events are processed in strict sequence order defined exclusively by the monotonic sequence number `seq`.
+  - Timestamps are ignored for ordering purposes, guaranteeing bit-for-bit identical replay results across different machines, operating systems, and CPU loads.
+- **Rigorous Event Transition Validation**:
+  - Enforces authoritative lifecycle transition invariants:
+    - Monotonic sequence continuity ($seq_{k+1} == seq_k + 1$).
+    - Run boundary validity: `RUN_STARTED` must occur exactly once at start; events after `RUN_COMPLETED` are prohibited (with the sole exception of expected clean worker process termination `WORKER_EXITED` during shutdown).
+    - Unknown entity rejection: jobs or workers must be created/started before being assigned or completed.
+    - Attempt ownership integrity: jobs cannot start or complete without an active worker assignment and running attempt.
+    - Retry and reassignment validity: retries are only legal following lost/failed attempts; reassignments require an active retry attempt.
+    - Duplicate terminal outcome prevention: attempts and jobs cannot be completed or failed more than once.
+    - Worker replacement integrity: replacement events require a previously failed or exited worker entity.
+- **Replay Result & Diagnostics (`ReplayResult`)**:
+  - Produces structured, JSON-serializable diagnostic records including validation status (`valid`), total event counts, final run state, reconstructed job and worker states, attempt and retry totals, worker failure and replacement metrics, and detailed diagnostic error strings.
+- **Relationship Between Runtime State, Trace, and Replay**:
+  ```
+  [ Runtime Execution ] ---> Emits Events ---> [ ExecutionTrace ]
+  (StaticRuntime, Workers)                     (TraceEvent Log)
+                                                      |
+                                                      v (Read-Only)
+                                             [ ReplayEngine ]
+                                                      |
+                                                      v (Reconstruct & Validate)
+                                             [ ReplayResult ]
+                                             - Logical State Audit
+                                             - Transition Invariant Check
+                                             - Telemetry Verification
+  ```
+
+### 1.10 Known Limitations of Milestone 5
+- **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state (persistent distributed logs are not yet implemented).
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
 - **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.
+- **Observational Trace Verification**: Replay validates logical consistency and state transitions from captured traces, but does not simulate network latency or re-run external side effects.
 
 ---
 

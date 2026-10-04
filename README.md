@@ -14,11 +14,18 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 4: Structured Event Tracing & Execution History)
+## Current Status (Milestone 5: Deterministic Replay Engine)
 
-Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, and canonical execution event tracing.
+Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing and Deterministic Replay Engine**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, and observational trace replay.
 
 ### What Currently Exists
+- **Deterministic Trace Replay Engine (`src/titan/replay.py`)**:
+  - Reconstructs and validates the logical execution history of a run strictly from its structured trace.
+  - Dedicated replay state model (`ReplayState`, `ReplayWorkerState`, `ReplayJobState`, `ReplayAttemptState`).
+  - Purely observational: executes zero workload code, spawns zero workers, invokes zero fault injection, and has no dependency on wall-clock time.
+  - Strict canonical ordering via sequence numbers (`seq`).
+  - Rigorous lifecycle transition validation: detects sequence breaks, run boundary violations, unknown entities, unassigned starts, illegal retries/reassignments, and duplicate completions.
+  - Structured JSON and human-readable diagnostic reporting (`ReplayResult`).
 - **Structured Execution Event Tracing (`src/titan/trace.py`)**:
   - Canonical logical event model (`TraceEvent`) with monotonic sequence numbers (`seq`), explicit lifecycle event types (`EventType`), observation timestamps, and structured payloads.
   - Lifecycle transitions: `RUN_STARTED`, `RUN_COMPLETED`, `WORKER_STARTED`, `WORKER_EXITED`, `WORKER_FAILED`, `WORKER_REPLACED`, `JOB_CREATED`, `JOB_ASSIGNED`, `JOB_STARTED`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_LOST`, `RETRY_SCHEDULED`, `JOB_REASSIGNED`.
@@ -53,13 +60,13 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured 
   - Computes wall-clock time, primary throughput (unique jobs/sec), attempt throughput, worker failures, retries, recovered jobs, permanently failed jobs, duplicate results ignored, and recovery duration.
 - **Authoritative Documentation**:
   - [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md): Non-negotiable principles, research scope, and non-goals.
-  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, structured event tracing, and limitations.
-  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-014, including ADR-014 on structured event tracing).
+  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, structured event tracing, and replay engine.
+  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-015, including ADR-015 on the deterministic replay engine).
   - [EXPERIMENTS.md](docs/EXPERIMENTS.md): Formal protocol template and completed trials for EXP-002.
 
 ### What Does NOT Exist Yet (Intentionally Unimplemented)
 To preserve architectural simplicity and scientific rigor:
-- **No Adaptive Scheduling**: No dynamic concurrency limits, adaptive backpressure, or load-sensitive routing yet (scheduled for Milestone 5).
+- **No Adaptive Scheduling**: No dynamic concurrency limits, adaptive backpressure, or load-sensitive routing yet (scheduled for subsequent milestones).
 - **No External Message Brokers**: Zero Kafka, RabbitMQ, or Redis. Standard library IPC queues are used exclusively.
 - **No Orchestrators or Cloud Dependencies**: Zero Kubernetes, Docker, or cloud APIs.
 - **No Databases**: No disk persistence or database layers.
@@ -121,6 +128,17 @@ Export execution trace to a JSON file:
 python src/titan/cli.py run --scenario baseline --trace-file trace.json
 ```
 
+### Replaying Execution Traces
+Replay a captured trace file and validate its logical consistency:
+```powershell
+python src/titan/cli.py replay trace.json
+```
+
+Replay a trace file and output structured JSON diagnostics:
+```powershell
+python src/titan/cli.py replay trace.json --json
+```
+
 ### Running Custom Workloads & Fault Injection
 Execute a custom workload with deterministic failure injection:
 ```powershell
@@ -133,7 +151,7 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 67-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 85-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```
@@ -142,3 +160,4 @@ Or using `pytest` (if installed in your Python environment):
 ```powershell
 pytest -v
 ```
+

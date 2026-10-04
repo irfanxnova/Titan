@@ -144,6 +144,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Export the structured execution trace to a JSON file.",
     )
 
+    # 'replay' subcommand
+    replay_parser = subparsers.add_parser(
+        "replay",
+        help="Replay and validate a structured execution trace file.",
+    )
+    replay_parser.add_argument(
+        "trace_file",
+        type=str,
+        help="Path to JSON execution trace file.",
+    )
+    replay_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output replay validation result formatted as JSON.",
+    )
+
     return parser
 
 
@@ -155,7 +171,7 @@ def handle_status(json_output: bool = False) -> int:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 4: Structured Event Tracing & Execution History",
+            "milestone": "Milestone 5: Deterministic Replay Engine",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
@@ -165,10 +181,10 @@ def handle_status(json_output: bool = False) -> int:
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   4 (Structured Event Tracing & Execution History)")
+        print("  Milestone:   5 (Deterministic Replay Engine)")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (Execution Event Tracing Active)")
+        print("  State:       Operational (Deterministic Replay Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
 
     return 0
@@ -319,6 +335,52 @@ def handle_run(
     return 0
 
 
+def handle_replay(trace_file: str, json_output: bool = False) -> int:
+    """Replay and validate an execution trace from a JSON file."""
+    from titan.replay import ReplayEngine
+
+    path = Path(trace_file)
+    if not path.exists():
+        print(f"Error: Trace file not found: {trace_file}", file=sys.stderr)
+        return 1
+
+    try:
+        result = ReplayEngine.replay_file(path)
+    except Exception as exc:
+        print(f"Error: Failed to load/replay trace: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(result.to_json(indent=2))
+    else:
+        print("=" * 66)
+        print("Titan Trace Replay & Validation Report")
+        print("=" * 66)
+        print(f"  Trace File:                    {trace_file}")
+        status_str = "VALID" if result.valid else "INVALID (Violations Detected)"
+        print(f"  Trace Integrity:               {status_str}")
+        print(f"  Total Events Processed:        {result.total_events}")
+        print(f"  Final Reconstructed Run State: {result.final_run_state}")
+        completed_jobs = sum(1 for s in result.reconstructed_job_states.values() if s == "COMPLETED")
+        failed_jobs = sum(1 for s in result.reconstructed_job_states.values() if s == "FAILED")
+        total_jobs = len(result.reconstructed_job_states)
+        print(f"  Jobs Reconstructed (Total):    {total_jobs} ({completed_jobs} completed, {failed_jobs} failed)")
+        print(f"  Total Attempts Reconstructed:  {result.attempts}")
+        print(f"  Retries Reconstructed:         {result.retries}")
+        print(f"  Worker Failures Detected:      {result.worker_failures}")
+        print(f"  Worker Replacements:           {result.worker_replacements}")
+        print(f"  Active / Total Workers:        {len(result.reconstructed_worker_states)}")
+        if result.validation_errors:
+            print(f"  Validation Errors ({len(result.validation_errors)}):")
+            for err in result.validation_errors:
+                print(f"    - {err}")
+        else:
+            print("  Validation Errors:             None (Consistent Execution History)")
+        print("=" * 66)
+
+    return 0 if result.valid else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -347,6 +409,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             show_trace=args.trace,
             trace_file=args.trace_file,
         )
+
+    if args.command == "replay":
+        return handle_replay(trace_file=args.trace_file, json_output=args.json)
 
     parser.print_help()
     return 0

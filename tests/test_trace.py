@@ -5,10 +5,16 @@ from __future__ import annotations
 import io
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+# Ensure src/ is on sys.path for direct invocation
+_src_path = str(Path(__file__).resolve().parent.parent / "src")
+if _src_path not in sys.path:
+    sys.path.insert(0, _src_path)
 
 from titan.cli import main
 from titan.job import AttemptKey, AttemptStatus, ExecutionAttempt, Job, JobAcquired, JobResult, JobStarted, JobStatus
@@ -239,8 +245,8 @@ class TestRuntimeExecutionTracing(unittest.TestCase):
         scenario = Scenario(
             name="trace-crash-test",
             num_workers=2,
-            num_jobs=8,
-            work_units=200,
+            num_jobs=16,
+            work_units=500,
             fault_config=FaultConfig(target_worker_id="worker-0", kill_after_jobs=2),
         )
         result = run_scenario(scenario)
