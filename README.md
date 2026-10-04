@@ -14,11 +14,28 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 9: Recovery-Policy Experimentation Framework)
+## Current Status (Milestone 10: Replay / Tracing Overhead & System Stress Evaluation)
 
-Titan has implemented the **Recovery-Policy Experimentation Framework**, building atop its authoritative failure-aware runtime, deterministic scenario definitions, structured event tracing, deterministic replay, fidelity divergence detection, root-cause failure analysis, and the TitanBench canonical failure corpus.
+Titan has implemented the **Replay / Tracing Overhead and System Stress Evaluation Framework**, expanding upon its authoritative runtime, deterministic scenario definitions, structured event tracing, deterministic replay engine, fidelity divergence detection, failure analysis, TitanBench failure corpus, and recovery-policy experimentation framework.
 
 ### What Currently Exists
+- **Replay / Tracing Overhead & Stress Evaluation Framework (`src/titan/experiment/evaluation.py`)**:
+  - Three explicit evaluation modes:
+    - `MODE A` (`NO_TRACE`): Workload executed with tracing disabled/bypassed at runtime (`ExecutionTrace(enabled=False)`), providing a zero-instrumentation baseline with identical execution semantics.
+    - `MODE B` (`WITH_TRACE`): Workload executed with canonical logical event tracing active.
+    - `MODE C` (`REPLAY_ONLY`): Trace replayed in isolation measuring replay processing duration and event throughput.
+  - Rigorous Overhead Metric Extraction:
+    - Absolute difference: `trace_duration - baseline_duration`.
+    - Relative overhead: `((trace_duration - baseline_duration) / baseline_duration) * 100` (safe division guard).
+    - Trace size efficiency: `trace_file_size_bytes / event_count` (bytes/event).
+    - Replay event throughput: `replay_events_processed / replay_duration_sec` (events/sec).
+  - Trace Size Scaling & Stress Progression:
+    - Evaluates scaling across worker counts (2, 4), job counts (10, 50, 100), fault complexity (clean, single crash, repeated crash), and recovery policies (R0 full recovery vs R2 limited retry).
+    - Bounded execution safety with explicit process lifecycle cleanup.
+  - Multi-Trial Repetition & Statistical Aggregation:
+    - Multi-trial execution (default 3 trials) with raw trial persistence and aggregate summaries (`mean`, `median`, `min`, `max`, `sample_count`).
+  - Standardized JSON artifacts persisted to `experiments/results/eval-<timestamp>-<type>/`.
+  - First-class CLI interface via `python src/titan/cli.py evaluate` (`overhead`, `replay`, `stress`, `all`).
 - **Recovery-Policy Experimentation Framework (`src/titan/experiment/`)**:
   - Explicit, immutable recovery policy model with stable identifiers:
     - `R0` (`baseline-full-recovery`): Automatic worker replacement enabled (`replace_failed_workers=True`), default retry budget (`max_retries=3`).
@@ -219,6 +236,27 @@ Execute the full canonical TitanBench failure corpus (Classes A through I) with 
 python src/titan/cli.py bench run-all
 ```
 
+### Running Overhead, Replay & Stress Evaluations
+Run tracing overhead evaluation (comparing Mode A without tracing vs Mode B with tracing):
+```powershell
+python src/titan/cli.py evaluate overhead --trials 3
+```
+
+Run replay duration and event throughput evaluation across canonical traces:
+```powershell
+python src/titan/cli.py evaluate replay
+```
+
+Run bounded scaling and stress evaluation:
+```powershell
+python src/titan/cli.py evaluate stress
+```
+
+Run full system evaluation suite and persist machine-readable JSON artifacts:
+```powershell
+python src/titan/cli.py evaluate all --trials 3
+```
+
 ### Running Custom Workloads & Fault Injection
 Execute a custom workload with deterministic failure injection:
 ```powershell
@@ -231,7 +269,7 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 141-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 182-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```

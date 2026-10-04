@@ -105,9 +105,19 @@ class TraceEvent:
 class ExecutionTrace:
     """Canonical chronological collector of logical execution events."""
 
-    def __init__(self, events: Sequence[TraceEvent] | None = None) -> None:
+    def __init__(
+        self,
+        events: Sequence[TraceEvent] | None = None,
+        enabled: bool = True,
+    ) -> None:
+        self._enabled = enabled
         self._events: list[TraceEvent] = list(events) if events else []
         self._seq_counter: int = len(self._events)
+
+    @property
+    def enabled(self) -> bool:
+        """Indicate whether trace collection is active."""
+        return self._enabled
 
     def emit(
         self,
@@ -119,6 +129,16 @@ class ExecutionTrace:
         timestamp: float | None = None,
     ) -> TraceEvent:
         """Create, sequence, and record a canonical logical trace event."""
+        if not self._enabled:
+            return TraceEvent(
+                seq=0,
+                event_type=event_type,
+                timestamp=0.0,
+                job_id=job_id,
+                attempt_id=attempt_id,
+                worker_id=worker_id,
+                data={},
+            )
         self._seq_counter += 1
         ts = timestamp if timestamp is not None else time.perf_counter()
         event = TraceEvent(

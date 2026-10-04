@@ -365,10 +365,38 @@ Implemented in `src/titan/experiment/`:
     - `trials/trace-NNN.json`: Canonical execution trace.
     - `comparisons/<scenario-id>/comparison.json`: Multi-policy side-by-side comparative evaluation.
 
-### 1.14 Known Limitations of Milestone 9
+### 1.14 Replay / Tracing Overhead and System Stress Evaluation Framework
+Implemented in `src/titan/experiment/evaluation.py`:
+- **Purpose and Architecture**:
+  - Provides a rigorous, reproducible evaluation harness to answer research questions RQ4 (*tracing overhead*) and RQ5 (*replay scaling cost and system stress behavior*).
+  - Explicitly decouples three operational evaluation modes:
+    - `Mode A` (`no_trace`): Runtime execution with trace collection disabled (`enable_tracing=False`). Bypasses trace event dataclass instantiation, copying, and append overhead while running the exact same logical workload.
+    - `Mode B` (`with_trace`): Runtime execution with canonical structured event tracing active (`enable_tracing=True`).
+    - `Mode C` (`replay_only`): Offline deterministic replay of previously captured traces measuring graph reconstruction runtime and event throughput.
+- **Fair Overhead Comparison Invariant**:
+  - Mode A and Mode B evaluations execute with bit-for-bit identical workload parameters: worker count, job count, work units, pattern, seed, fault configurations, and retry limits.
+  - Only trace event recording is varied.
+- **Overhead & Replay Metrics**:
+  - `absolute_overhead_sec = with_trace_sec - no_trace_sec`
+  - `relative_overhead_pct = ((with_trace_sec - no_trace_sec) / no_trace_sec) * 100` (safe when `no_trace_sec > 0`)
+  - `trace_size_bytes`: Serialized UTF-8 JSON trace size on disk.
+  - `bytes_per_event = trace_size_bytes / event_count`
+  - `replay_events_per_sec = replay_events_processed / replay_duration_sec`: Quantifies in-memory replay engine throughput (graph reconstruction and transition invariant checks), which is explicitly distinct from physical workload throughput.
+- **Stress & Scaling Evaluation Matrix**:
+  - Systematically evaluates increasing complexity across:
+    - *Concurrency & Workload Scaling*: Small (2 workers, 10 jobs), Medium (2 workers, 50 jobs), Large (4 workers, 100 jobs).
+    - *Failure Intensity*: Single worker crash and recovery, repeated sequential worker failures across distinct worker processes.
+    - *Retry Pressure*: Normal retry recovery vs. limited-retry fail-fast (`max_retries=1`).
+- **Environmental Controls & Logical Determinism**:
+  - Optional warm-up iterations allow OS process spawning and runtime import caching to stabilize prior to measured timing trials.
+  - Strict conceptual separation between *logical determinism* (reproducible event sequences, state reconstruction, recovery classifications) and *physical timing variability* (Windows process spawning latency, OS scheduling jitter).
+  - Raw timing samples across repeated trials ($N \ge 3$) are preserved alongside aggregate summary statistics (`count`, `mean`, `median`, `min`, `max`).
+
+### 1.15 Known Limitations of Milestone 10
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state.
-- **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
-- **Basic Summary Statistics**: The framework computes mean, min, and max across repeated trials. Complex statistical inference (confidence intervals, ANOVA, hypothesis testing) is intentionally deferred to the evaluation milestone.
+- **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes (`multiprocessing.Queue`).
+- **OS Process Spawning Jitter**: On Windows, child processes spawned via `multiprocessing.spawn` incur non-deterministic process startup latency (typically 50–200ms per pool). Wall-clock measurements reflect this host scheduling variance.
+- **Summary Statistics Only**: Metrics report sample counts, means, medians, min, and max. Final research-grade inference (confidence intervals, ANOVA, hypothesis testing) is intentionally deferred to Milestone 11.
 - **No Learned Recovery**: Policies are static configurations; dynamic or machine-learning-based recovery selection is out of scope.
 
 ---

@@ -111,22 +111,25 @@ class ExperimentTrial:
 
 @dataclass(frozen=True)
 class MetricStats:
-    """Summary statistics (count, mean, min, max) for numeric experiment metrics."""
+    """Summary statistics (count, mean, median, min, max) for numeric experiment metrics."""
 
     count: int
     mean: float
-    min: float
-    max: float
+    median: float = 0.0
+    min: float = 0.0
+    max: float = 0.0
 
     @classmethod
     def compute(cls, values: Sequence[float | int]) -> MetricStats:
-        """Compute count, mean, min, max from a sequence of numeric values."""
+        """Compute count, mean, median, min, max from a sequence of numeric values."""
         if not values:
-            return cls(count=0, mean=0.0, min=0.0, max=0.0)
+            return cls(count=0, mean=0.0, median=0.0, min=0.0, max=0.0)
         float_vals = [float(v) for v in values]
+        import statistics
         return cls(
             count=len(float_vals),
             mean=sum(float_vals) / len(float_vals),
+            median=float(statistics.median(float_vals)),
             min=min(float_vals),
             max=max(float_vals),
         )
@@ -136,6 +139,7 @@ class MetricStats:
         return {
             "count": self.count,
             "mean": round(self.mean, 4),
+            "median": round(self.median, 4),
             "min": round(self.min, 4),
             "max": round(self.max, 4),
         }
@@ -146,6 +150,7 @@ class MetricStats:
         return cls(
             count=int(data["count"]),
             mean=float(data["mean"]),
+            median=float(data.get("median", data["mean"])),
             min=float(data["min"]),
             max=float(data["max"]),
         )

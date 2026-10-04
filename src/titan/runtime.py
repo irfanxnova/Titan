@@ -50,6 +50,7 @@ class StaticRuntime:
         replace_failed_workers: bool = True,
         failure_config: FailureConfig | Sequence[FailureConfig] | None = None,
         duplicate_jobs: Sequence[str] = (),
+        enable_tracing: bool = True,
     ) -> None:
         if num_workers < 1:
             raise ValueError(f"num_workers must be at least 1, got {num_workers}")
@@ -59,6 +60,7 @@ class StaticRuntime:
         self.num_workers = num_workers
         self.max_retries = max_retries
         self.replace_failed_workers = replace_failed_workers
+        self.enable_tracing = enable_tracing
         if failure_config is None:
             self.failure_configs: list[FailureConfig] = []
         elif isinstance(failure_config, FailureConfig):
@@ -104,7 +106,7 @@ class StaticRuntime:
         self._recovery_end_time: float | None = None
 
         # Structured Execution Event Tracing (Observational)
-        self._trace = ExecutionTrace()
+        self._trace = ExecutionTrace(enabled=enable_tracing)
 
     @property
     def is_running(self) -> bool:

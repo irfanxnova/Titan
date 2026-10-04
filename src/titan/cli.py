@@ -369,6 +369,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output results formatted as JSON.",
     )
 
+    # 'evaluate' subcommand
+    eval_parser = subparsers.add_parser(
+        "evaluate",
+        help="Evaluate tracing overhead, replay throughput, and system stress/scaling.",
+    )
+    eval_subparsers = eval_parser.add_subparsers(
+        dest="evaluate_command",
+        help="Evaluation actions (overhead, replay, stress, all)",
+    )
+
+    # evaluate overhead
+    eval_ovh = eval_subparsers.add_parser("overhead", help="Measure tracing overhead vs no-trace baseline.")
+    eval_ovh.add_argument("--trials", "-t", type=int, default=3, help="Number of repetitions per workload (default: 3).")
+    eval_ovh.add_argument("--no-warmup", action="store_true", help="Disable warm-up execution.")
+    eval_ovh.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for results.")
+    eval_ovh.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
+
+    # evaluate replay
+    eval_rep = eval_subparsers.add_parser("replay", help="Measure deterministic replay runtime and throughput.")
+    eval_rep.add_argument("--trials", "-t", type=int, default=5, help="Number of replay repetitions (default: 5).")
+    eval_rep.add_argument("--trace-file", type=str, default=None, help="Specific trace file to evaluate.")
+    eval_rep.add_argument("--no-warmup", action="store_true", help="Disable warm-up replay.")
+    eval_rep.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for results.")
+    eval_rep.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
+
+    # evaluate stress
+    eval_str = eval_subparsers.add_parser("stress", help="Evaluate scaling and stress across workload matrix.")
+    eval_str.add_argument("--timeout", type=float, default=30.0, help="Per-workload timeout in seconds.")
+    eval_str.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for results.")
+    eval_str.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
+
+    # evaluate all
+    eval_all = eval_subparsers.add_parser("all", help="Execute complete Prompt 10 evaluation suite.")
+    eval_all.add_argument("--trials", "-t", type=int, default=3, help="Repetitions for timing tests (default: 3).")
+    eval_all.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for results.")
+    eval_all.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
+
     return parser
 
 
@@ -385,22 +422,23 @@ def handle_status(json_output: bool = False) -> int:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 9: Recovery-Policy Experimentation Framework",
+            "milestone": "Milestone 10: Replay/Tracing Overhead & System Stress Evaluation",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
             "scenarios": list(PREDEFINED_SCENARIOS.keys()),
             "benchmark_corpus": bench_scenarios,
             "recovery_policies": policies,
+            "evaluation_framework": "active",
         }
         print(json.dumps(data, indent=2))
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   9 (Recovery-Policy Framework; Milestone:   8 (TitanBench Failure Corpus & Runner))")
+        print("  Milestone:   10 (Overhead & Stress Evaluation; Milestone:   9; Milestone:   8 (TitanBench Failure Corpus & Runner))")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (TitanBench Active, Recovery Policies Active)")
+        print("  State:       Operational (TitanBench Active, Recovery Policies Active, Evaluation Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
         print(f"  TitanBench:  {len(bench_scenarios)} canonical scenarios ({', '.join(bench_scenarios)})")
         print(f"  Policies:    {', '.join(policies)}")
@@ -1071,6 +1109,155 @@ def handle_experiment_run_config(
     return 0
 
 
+def handle_evaluate_overhead(
+    trials: int = 3,
+    no_warmup: bool = False,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute trace overhead evaluation suite comparing no-trace vs trace-enabled."""
+    from titan.experiment.evaluation import EvaluationRunner
+
+    runner = EvaluationRunner(output_base_dir=output_dir or "experiments/results")
+    results = runner.run_overhead_suite(repetitions=trials, warmup=not no_warmup)
+
+    if json_output:
+        print(json.dumps([r.to_dict() for r in results], indent=2))
+        return 0
+
+    print("=" * 90)
+    print("Titan Tracing Overhead Evaluation Report")
+    print(f"Evaluated with {trials} trials per workload. Non-instrumentation variables controlled.")
+    print("=" * 90)
+    header = f"{'Workload':<18} | {'Workers':<7} | {'Jobs':<5} | {'No-Trace (s)':<12} | {'With-Trace (s)':<14} | {'Trace (KB)':<10} | {'Overhead (%)':<12}"
+    print(header)
+    print("-" * 90)
+    for r in results:
+        trace_kb = r.trace_size_bytes / 1024.0
+        line = (
+            f"{r.workload_name:<18} | {r.workers:<7} | {r.jobs:<5} | "
+            f"{r.no_trace_duration_stats.mean:<12.4f} | {r.with_trace_duration_stats.mean:<14.4f} | "
+            f"{trace_kb:<10.2f} | {r.relative_overhead_stats.mean:<12.2f}"
+        )
+        print(line)
+    print("=" * 90)
+    return 0
+
+
+def handle_evaluate_replay(
+    trials: int = 5,
+    trace_file: str | None = None,
+    no_warmup: bool = False,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute deterministic replay evaluation suite measuring duration and throughput."""
+    from titan.experiment.evaluation import EvaluationRunner
+    from titan.trace import ExecutionTrace
+
+    runner = EvaluationRunner(output_base_dir=output_dir or "experiments/results")
+
+    if trace_file is not None:
+        try:
+            trace = ExecutionTrace.load_from_file(trace_file)
+        except Exception as exc:
+            print(f"Error loading trace file '{trace_file}': {exc}", file=sys.stderr)
+            return 1
+        results = [
+            runner.run_replay_evaluation(
+                trace,
+                trace_name=Path(trace_file).stem,
+                trace_source=trace_file,
+                repetitions=trials,
+                warmup=not no_warmup,
+            )
+        ]
+    else:
+        results = runner.run_replay_suite(repetitions=trials, warmup=not no_warmup)
+
+    if json_output:
+        print(json.dumps([r.to_dict() for r in results], indent=2))
+        return 0
+
+    print("=" * 90)
+    print("Titan Deterministic Replay Evaluation Report")
+    print(f"Evaluated with {trials} replay repetitions per trace. Observational & non-destructive.")
+    print("=" * 90)
+    header = f"{'Trace Name':<24} | {'Events':<7} | {'Size (KB)':<10} | {'Duration (s)':<14} | {'Throughput (ev/s)':<18} | {'Valid':<5}"
+    print(header)
+    print("-" * 90)
+    for r in results:
+        size_kb = r.trace_size_bytes / 1024.0
+        line = (
+            f"{r.trace_name:<24} | {r.trace_event_count:<7} | {size_kb:<10.2f} | "
+            f"{r.replay_duration_stats.mean:<14.6f} | {r.replay_throughput_stats.mean:<18.1f} | "
+            f"{'YES' if r.replay_valid else 'NO':<5}"
+        )
+        print(line)
+    print("=" * 90)
+    return 0
+
+
+def handle_evaluate_stress(
+    timeout: float = 30.0,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute system stress and scaling evaluation matrix."""
+    from titan.experiment.evaluation import EvaluationRunner
+
+    runner = EvaluationRunner(output_base_dir=output_dir or "experiments/results")
+    results = runner.run_stress_suite(timeout=timeout)
+
+    if json_output:
+        print(json.dumps([r.to_dict() for r in results], indent=2))
+        return 0
+
+    print("=" * 105)
+    print("Titan System Stress & Scalability Evaluation Report")
+    print("Controlled scaling across concurrency, workload size, failure intensity, and retry pressure.")
+    print("=" * 105)
+    header = f"{'Configuration':<24} | {'Category':<20} | {'W':<3} | {'J':<4} | {'Status':<9} | {'Recovery':<12} | {'Duration (s)':<12} | {'Goodput':<10}"
+    print(header)
+    print("-" * 105)
+    for r in results:
+        t = r.trials[0] if r.trials else None
+        status = t.execution_status if t else "N/A"
+        recovery = t.recovery_outcome if t else "N/A"
+        dur = r.execution_duration_stats.mean
+        goodput = r.goodput_stats.mean
+        line = (
+            f"{r.config.name:<24} | {r.config.category:<20} | {r.config.workers:<3} | {r.config.jobs:<4} | "
+            f"{status:<9} | {recovery:<12} | {dur:<12.4f} | {goodput:<10.1f}"
+        )
+        print(line)
+    print("=" * 105)
+    return 0
+
+
+def handle_evaluate_all(
+    trials: int = 3,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute comprehensive Prompt 10 evaluation suite: overhead + replay + stress."""
+    from titan.experiment.evaluation import EvaluationRunner
+
+    runner = EvaluationRunner(output_base_dir=output_dir or "experiments/results")
+    suite = runner.run_full_system_evaluation(overhead_repetitions=trials, replay_repetitions=trials)
+
+    if json_output:
+        print(suite.to_json(indent=2))
+        return 0
+
+    handle_evaluate_overhead(trials=trials, output_dir=output_dir, json_output=False)
+    print()
+    handle_evaluate_replay(trials=trials, output_dir=output_dir, json_output=False)
+    print()
+    handle_evaluate_stress(output_dir=output_dir, json_output=False)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -1159,6 +1346,38 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             print("Error: Specify an experiment subcommand (list-policies, run, compare, run-config). See 'titan experiment --help'.", file=sys.stderr)
+            return 1
+
+    if args.command == "evaluate":
+        if args.evaluate_command == "overhead":
+            return handle_evaluate_overhead(
+                trials=args.trials,
+                no_warmup=args.no_warmup,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.evaluate_command == "replay":
+            return handle_evaluate_replay(
+                trials=args.trials,
+                trace_file=args.trace_file,
+                no_warmup=args.no_warmup,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.evaluate_command == "stress":
+            return handle_evaluate_stress(
+                timeout=args.timeout,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.evaluate_command == "all":
+            return handle_evaluate_all(
+                trials=args.trials,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        else:
+            print("Error: Specify an evaluate subcommand (overhead, replay, stress, all). See 'titan evaluate --help'.", file=sys.stderr)
             return 1
 
     parser.print_help()

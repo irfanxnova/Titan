@@ -52,6 +52,7 @@ class RecoveryPolicy:
             fault_configs=scenario.fault_configs,
             duplicate_jobs=scenario.duplicate_jobs,
             timeout=scenario.timeout,
+            enable_tracing=scenario.enable_tracing,
         )
 
     def to_dict(self) -> dict[str, Any]:

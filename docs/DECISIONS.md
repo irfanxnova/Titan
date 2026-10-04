@@ -365,6 +365,43 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Provides a fair, rigorous, and automated harness for comparative recovery-policy research; captures empirical trade-offs (e.g. capacity degradation in R1 vs. full recovery in R0; retry exhaustion in R2 vs. recovery in R0); ensures reproducible data collection for future ablation and statistical evaluation milestones.
   - *Negative*: Multi-trial experiments require cumulative runtime proportional to repetition count and workload size.
 
+---
+
+## ADR-020: Replay/Tracing Overhead and System Stress Evaluation Methodology
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestone 9 established the recovery-policy experimentation framework. However, distributed tracing and deterministic replay systems introduce measurement overhead and potential scalability bottlenecks. To answer core research questions RQ4 (*"How much runtime overhead does deterministic tracing impose?"*) and RQ5 (*"How does replay difficulty/system behavior change as workers, concurrent jobs, retries, and failure complexity increase?"*), Titan requires an explicit, reproducible evaluation methodology. The framework must evaluate:
+  1. Tracing instrumentation overhead by comparing identical workloads with and without trace collection.
+  2. Deterministic replay runtime and trace-size cost across increasing workload complexity.
+  3. System scaling and stress behavior under controlled concurrency, workload size, failure intensity, and retry pressure.
+- **Decision**:
+  1. Introduce three distinct evaluation modes (`EvaluationMode` in `src/titan/experiment/evaluation.py`):
+     - `Mode A` (`no_trace`): Runtime execution with structured event trace collection disabled via an explicit `enable_tracing=False` switch.
+     - `Mode B` (`with_trace`): Runtime execution with canonical structured event tracing active (`enable_tracing=True`).
+     - `Mode C` (`replay_only`): Offline deterministic replay of previously captured execution traces without active workload dispatch.
+  2. Implement observational non-interference for `enable_tracing=False`:
+     - When `enable_tracing=False`, `ExecutionTrace` short-circuits `emit()` calls, bypassing timestamp queries, frozen dataclass instantiation, dictionary copying, and event list allocation.
+     - The coordinator's authoritative state machine, failure detection, worker management, retries, and result accounting remain strictly identical to trace-enabled execution.
+  3. Implement rigorous overhead and replay metrics with strict zero-denominator protection:
+     - `absolute_overhead_sec = with_trace_sec - no_trace_sec`
+     - `relative_overhead_pct = ((with_trace_sec - no_trace_sec) / no_trace_sec) * 100` (safe when `no_trace_sec > 0`)
+     - `trace_size_bytes`: Byte length of serialized UTF-8 trace JSON.
+     - `bytes_per_event = trace_size_bytes / event_count`
+     - `replay_events_per_sec = replay_events_processed / replay_duration_sec`
+     - Replay throughput measures in-memory graph reconstruction and invariant validation; it is explicitly documented as distinct from physical workload throughput.
+  4. Multi-trial execution and environment controls:
+     - Enforce repeated trials (default 3 for timing overhead, 5 for replay throughput) recording both raw trials and summary statistics (`count`, `mean`, `median`, `min`, `max`).
+     - Provide optional warm-up execution to allow OS process spawning and Python import caching to stabilize prior to measured runs.
+     - Distinguish logical determinism (scenarios, event sequences, recovery outcomes) from physical timing variability (Windows process spawning jitter, scheduler latency).
+  5. Focused stress and scalability evaluation:
+     - Evaluate a controlled matrix across concurrency scaling (2 to 4 workers, 10 to 100 jobs), single failure intensity, repeated failure across multiple workers, and retry pressure / fail-fast configurations.
+     - Enforce bounded timeouts and clean worker process termination to prevent runaway resource consumption.
+  6. CLI interface: Add `python src/titan/cli.py evaluate` supporting subcommands `overhead`, `replay`, `stress`, and `all` in both human-readable tabular and machine-readable JSON formats.
+- **Consequences**:
+  - *Positive*: Provides an objective, reproducible, and automated harness to quantify tracing overhead and replay scaling costs; separates logical determinism from physical timing variation; prepares empirical measurement artifacts for Prompt 11.
+  - *Negative*: Repeated multi-process executions under Windows incur process spawn overhead; timing measurements exhibit natural OS scheduling variance that must be reported transparently rather than smoothed artificially.
+
 
 
 

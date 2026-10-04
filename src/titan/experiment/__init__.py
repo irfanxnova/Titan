@@ -1,9 +1,24 @@
-"""Titan Recovery-Policy Experimentation Framework.
+"""Titan Recovery-Policy Experimentation Framework and System Evaluation.
 
 Provides a systematic, fair, and reproducible framework for evaluating and comparing
-recovery policies under controlled distributed failure scenarios.
+recovery policies, measuring tracing overhead, quantifying replay performance,
+and evaluating system scaling and stress under controlled distributed failures.
 """
 
+from titan.experiment.evaluation import (
+    EvaluationMode,
+    EvaluationRunner,
+    ReplayEvaluationResult,
+    ReplayEvaluationTrial,
+    StressEvaluationResult,
+    StressTrial,
+    StressWorkloadConfig,
+    SystemEvaluationSuite,
+    TraceOverheadResult,
+    TraceOverheadTrial,
+    compute_relative_overhead,
+    safe_div,
+)
 from titan.experiment.metrics import (
     METRIC_DEFINITIONS,
     UNAVAILABLE_METRICS,
@@ -36,4 +51,16 @@ __all__ = [
     "ExperimentResult",
     "PolicyComparison",
     "ExperimentRunner",
+    "EvaluationMode",
+    "EvaluationRunner",
+    "TraceOverheadTrial",
+    "TraceOverheadResult",
+    "ReplayEvaluationTrial",
+    "ReplayEvaluationResult",
+    "StressWorkloadConfig",
+    "StressTrial",
+    "StressEvaluationResult",
+    "SystemEvaluationSuite",
+    "safe_div",
+    "compute_relative_overhead",
 ]

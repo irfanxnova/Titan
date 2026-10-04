@@ -87,6 +87,7 @@ class Scenario:
     fault_configs: tuple[FaultConfig, ...] = ()
     duplicate_jobs: tuple[str, ...] = ()
     timeout: float | None = None
+    enable_tracing: bool = True
 
     @property
     def all_fault_configs(self) -> tuple[FaultConfig, ...]:
@@ -206,6 +207,7 @@ class ScenarioResult:
                 if self.scenario.all_fault_configs
                 else [],
                 "duplicate_jobs": list(self.scenario.duplicate_jobs),
+                "enable_tracing": self.scenario.enable_tracing,
             },
             "metrics": self.metrics.to_dict(),
             "trace": self.trace.to_list() if self.trace is not None else [],
@@ -226,6 +228,7 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         replace_failed_workers=scenario.replace_failed_workers,
         failure_config=failure_cfg,
         duplicate_jobs=scenario.duplicate_jobs,
+        enable_tracing=scenario.enable_tracing,
     )
     trace = None
     try:
