@@ -69,7 +69,7 @@ class TestTitanSkeleton(unittest.TestCase):
         output = stdout_capture.getvalue()
         self.assertIn("Titan Research Platform", output)
         self.assertIn("0.1.0", output)
-        self.assertIn("Milestone:   5 (Deterministic Replay Engine)", output)
+        self.assertIn("Milestone:   6 (Replay Fidelity & Divergence Detection)", output)
 
     def test_cli_status_json(self) -> None:
         """Verify the machine-readable JSON status subcommand output."""

@@ -255,6 +255,31 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Establishes a rock-solid, deterministic audit layer for execution history; enables offline verification of runs; provides the foundational tool for divergence detection and automated failure analysis in subsequent research milestones.
   - *Negative*: Trace replay validates the logical sequence recorded in the trace, but cannot verify external state outside the captured trace schema.
 
+---
+
+## ADR-016: Replay Fidelity & Divergence Detection Engine
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestone 5 implemented deterministic replay for structural validation and logical state reconstruction. However, experimental evaluation requires verifying that a replayed execution artifact strictly adheres to an authoritative expected execution contract. When an execution diverges (due to software regressions, faulty policies, or unexpected nondeterminism), the system must pinpoint the exact canonical sequence position, divergence category, and context without relying on nondeterministic timestamps or free-form text diffs.
+- **Decision**:
+  1. Define a structured divergence model (`DivergenceCategory`, `DivergenceRecord`) with explicit categories:
+     - `EVENT`: Sequence break, event type mismatch, missing event, or extra unexpected event.
+     - `STATE`: Reconstructed run or job lifecycle state discrepancy.
+     - `OWNERSHIP`: Worker assigned to execute an attempt differs from expected worker.
+     - `RETRY`: Retry count, retry attempt ID, or retry decision mismatch.
+     - `WORKER`: Worker entity lifecycle, failure, or replacement topology discrepancy.
+     - `OUTCOME`: Final job result, error payload, or run terminal count mismatch.
+  2. Implement a dedicated fidelity comparison engine (`ReplayFidelityEngine` in `src/titan/replay.py`).
+  3. Enforce deterministic equivalence rules comparing only canonical properties (sequence order, event types, job/attempt identities, worker ownership, retry decisions, terminal outcomes, and reconstructed state) while strictly ignoring nondeterministic metadata (wall-clock timestamps, observation latencies, OS process IDs, memory addresses).
+  4. Ensure that the first reported divergence is 100% deterministic by processing events in canonical sequence order ($seq = 1, 2, \dots$) followed by deterministically sorted state entity keys.
+  5. Return a structured `FidelityResult` serializable to JSON and human-readable reports distinguishing `REPLAY EQUIVALENT` from `REPLAY DIVERGED`.
+  6. Extend the CLI `replay` subcommand with `--compare <expected-trace-file>` while preserving existing replay behavior when omitted.
+- **Consequences**:
+  - *Positive*: Provides an automated, deterministic regression and fidelity testing mechanism; enables root-cause failure analysis by isolating the earliest point of divergence; establishes the comparative evaluation baseline for future adaptive execution policies.
+  - *Negative*: Comparison requires an authoritative expected trace or model; concurrent multi-process executions with identical seeds may exhibit thread/process interleaving differences unless isolated to single-worker execution or strictly synchronized.
+
+
 
 
 

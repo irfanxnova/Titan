@@ -6,7 +6,7 @@ This document serves as the architectural source of truth for Titan. It explicit
 
 ## 1. Confirmed Architecture
 
-As of Milestone 5, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing and Deterministic Replay Engine**:
+As of Milestone 6, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, and Replay Fidelity / Divergence Detection**:
 
 ```
                                   [ Titan CLI ]
@@ -197,9 +197,40 @@ Implemented in `src/titan/replay.py`:
                                              - Logical State Audit
                                              - Transition Invariant Check
                                              - Telemetry Verification
-  ```
+### 1.10 Replay Fidelity & Divergence Detection
+Implemented in `src/titan/replay.py`:
+- **Concept of Replay Fidelity in Titan**:
+  - Beyond structural integrity validation (Milestone 5), replay fidelity evaluates whether an observed execution trace conforms exactly to an expected canonical execution contract.
+  - Replay fidelity provides the foundational comparison layer for regression detection, divergence analysis, and fault verification across trials.
+- **Constituents of Deterministic Equivalence**:
+  Two execution traces are deemed *equivalent* if and only if all canonical deterministic dimensions match:
+  1. *Sequence Ordering & Event Types*: Identical canonical sequence order and event types (`seq`, `event_type`).
+  2. *Job & Attempt Identity*: Identical logical job identities and attempt numbers across all transitions.
+  3. *In-Flight Ownership*: Identical worker assignment and execution ownership for every attempt.
+  4. *Retry & Reassignment History*: Identical retry decisions, attempt counts, and reassignment targets.
+  5. *Worker Pool Lifecycle & Topology*: Identical worker startup, failure, replacement, and exit events.
+  6. *Terminal Outcomes & State*: Identical per-job terminal outcomes (`COMPLETED` vs `FAILED`), result payloads, and aggregate run counters.
+- **Intentionally Ignored Metadata**:
+  The fidelity comparison engine strictly ignores nondeterministic telemetry:
+  - Wall-clock observation timestamps (`timestamp`, `acquired_at`, `completed_at`, `duration`).
+  - Host execution details (OS process PIDs, CPU core IDs, thread IDs).
+  - Internal memory addresses or Python object IDs.
+- **Explicit Divergence Classification (`DivergenceCategory`)**:
+  Divergences are classified into explicit, structured categories:
+  - `EVENT`: Sequence number discontinuity, event type mismatch, missing event, or unexpected extra event.
+  - `STATE`: Reconstructed run or job lifecycle state differs from expected state.
+  - `OWNERSHIP`: Worker executing an attempt differs from expected worker assignment.
+  - `RETRY`: Retry count, retry attempt number, or retry scheduling decision differs.
+  - `WORKER`: Worker lifecycle entity, failure event, replacement mapping, or pool status differs.
+  - `OUTCOME`: Final job completion result, error payload, or run completion count differs.
+- **Deterministic Reporting Contract (`FidelityResult`, `DivergenceRecord`)**:
+  - The comparison engine walks events in strict canonical sequence order ($seq = 1, 2, \dots$), guaranteeing that the *first divergence* reported is 100% deterministic and reproducible.
+  - Generates structured, JSON-serializable payloads containing equivalence status, total comparisons, divergence count, ordered divergence records, first divergence, and category summaries.
+- **Limitations of the Comparison Model**:
+  - Comparison operates over structured trace records and reconstructed state; it does not perform deep AST code diffs of workload functions.
+  - While single-worker deterministic executions produce bit-for-bit identical traces across separate physical runs, multi-worker concurrent executions subject to OS process scheduling jitter may interleave independent jobs differently unless synchronized by the coordinator.
 
-### 1.10 Known Limitations of Milestone 5
+### 1.11 Known Limitations of Milestone 6
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state (persistent distributed logs are not yet implemented).
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
 - **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.

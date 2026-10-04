@@ -14,11 +14,17 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 5: Deterministic Replay Engine)
+## Current Status (Milestone 6: Replay Fidelity & Divergence Detection)
 
-Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing and Deterministic Replay Engine**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, and observational trace replay.
+Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, and Replay Fidelity / Divergence Detection**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, observational trace replay, and automated fidelity divergence detection.
 
 ### What Currently Exists
+- **Replay Fidelity & Divergence Detection (`src/titan/replay.py`)**:
+  - Compares observed execution traces or replay results against expected deterministic execution contracts.
+  - Explicit divergence model (`DivergenceCategory`, `DivergenceRecord`) distinguishing `EVENT`, `STATE`, `OWNERSHIP`, `RETRY`, `WORKER`, and `OUTCOME` divergences.
+  - Strict deterministic equivalence: evaluates sequence ordering, event types, job/attempt identities, worker ownership, retry decisions, and terminal outcomes while ignoring wall-clock timestamps and latency.
+  - 100% deterministic first-divergence localization.
+  - CLI integration via `--compare <expected_trace_file>` with `REPLAY EQUIVALENT` vs `REPLAY DIVERGED` human-readable reporting and structured JSON diagnostics (`FidelityResult`).
 - **Deterministic Trace Replay Engine (`src/titan/replay.py`)**:
   - Reconstructs and validates the logical execution history of a run strictly from its structured trace.
   - Dedicated replay state model (`ReplayState`, `ReplayWorkerState`, `ReplayJobState`, `ReplayAttemptState`).
@@ -60,8 +66,8 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured 
   - Computes wall-clock time, primary throughput (unique jobs/sec), attempt throughput, worker failures, retries, recovered jobs, permanently failed jobs, duplicate results ignored, and recovery duration.
 - **Authoritative Documentation**:
   - [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md): Non-negotiable principles, research scope, and non-goals.
-  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, structured event tracing, and replay engine.
-  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-015, including ADR-015 on the deterministic replay engine).
+  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, structured event tracing, replay engine, and fidelity detection.
+  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-016, including ADR-016 on replay fidelity and divergence detection).
   - [EXPERIMENTS.md](docs/EXPERIMENTS.md): Formal protocol template and completed trials for EXP-002.
 
 ### What Does NOT Exist Yet (Intentionally Unimplemented)
@@ -139,6 +145,16 @@ Replay a trace file and output structured JSON diagnostics:
 python src/titan/cli.py replay trace.json --json
 ```
 
+Compare an observed trace against an expected trace for fidelity and divergence detection:
+```powershell
+python src/titan/cli.py replay trace.json --compare expected_trace.json
+```
+
+Compare traces with structured JSON divergence output:
+```powershell
+python src/titan/cli.py replay trace.json --compare expected_trace.json --json
+```
+
 ### Running Custom Workloads & Fault Injection
 Execute a custom workload with deterministic failure injection:
 ```powershell
@@ -151,7 +167,7 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 85-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 103-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```
@@ -160,4 +176,5 @@ Or using `pytest` (if installed in your Python environment):
 ```powershell
 pytest -v
 ```
+
 

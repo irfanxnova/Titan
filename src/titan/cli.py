@@ -157,7 +157,16 @@ def build_parser() -> argparse.ArgumentParser:
     replay_parser.add_argument(
         "--json",
         action="store_true",
-        help="Output replay validation result formatted as JSON.",
+        help="Output replay validation or fidelity result formatted as JSON.",
+    )
+    replay_parser.add_argument(
+        "--compare",
+        "--compare-to",
+        "--expected",
+        dest="expected_trace_file",
+        type=str,
+        default=None,
+        help="Compare the replayed trace against an expected trace file for fidelity and divergence detection.",
     )
 
     return parser
@@ -171,7 +180,7 @@ def handle_status(json_output: bool = False) -> int:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 5: Deterministic Replay Engine",
+            "milestone": "Milestone 6: Replay Fidelity & Divergence Detection",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
@@ -181,10 +190,10 @@ def handle_status(json_output: bool = False) -> int:
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   5 (Deterministic Replay Engine)")
+        print("  Milestone:   6 (Replay Fidelity & Divergence Detection)")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (Deterministic Replay Active)")
+        print("  State:       Operational (Replay Fidelity Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
 
     return 0
@@ -335,15 +344,98 @@ def handle_run(
     return 0
 
 
-def handle_replay(trace_file: str, json_output: bool = False) -> int:
-    """Replay and validate an execution trace from a JSON file."""
-    from titan.replay import ReplayEngine
+def handle_replay(
+    trace_file: str,
+    json_output: bool = False,
+    expected_trace_file: str | None = None,
+) -> int:
+    """Replay and validate an execution trace, optionally checking fidelity against an expected trace."""
+    from titan.replay import ReplayEngine, ReplayFidelityEngine
 
     path = Path(trace_file)
     if not path.exists():
         print(f"Error: Trace file not found: {trace_file}", file=sys.stderr)
         return 1
 
+    # Fidelity comparison mode
+    if expected_trace_file is not None:
+        expected_path = Path(expected_trace_file)
+        if not expected_path.exists():
+            print(f"Error: Expected trace file not found: {expected_trace_file}", file=sys.stderr)
+            return 1
+
+        try:
+            fidelity_result = ReplayFidelityEngine.compare_files(
+                expected_path=expected_path,
+                observed_path=path,
+            )
+        except Exception as exc:
+            print(f"Error: Failed during fidelity comparison: {exc}", file=sys.stderr)
+            return 1
+
+        if json_output:
+            print(fidelity_result.to_json(indent=2))
+        else:
+            print("=" * 66)
+            print("Titan Replay Fidelity & Divergence Report")
+            print("=" * 66)
+            print(f"  Observed Trace:                {trace_file}")
+            print(f"  Expected Trace:                {expected_trace_file}")
+            status_str = (
+                "REPLAY EQUIVALENT"
+                if fidelity_result.equivalent
+                else "REPLAY DIVERGED (Execution Contract Divergence)"
+            )
+            print(f"  Fidelity Status:               {status_str}")
+            print(f"  Total Comparisons:             {fidelity_result.total_comparisons}")
+            print(f"  Total Divergences:             {fidelity_result.divergence_count}")
+            print(f"  Expected Events:               {fidelity_result.expected_events_count}")
+            print(f"  Observed Events:               {fidelity_result.observed_events_count}")
+
+            if fidelity_result.equivalent:
+                print("  Diagnostic Summary:            Replayed execution perfectly matches the expected deterministic contract.")
+            else:
+                first = fidelity_result.first_divergence
+                if first:
+                    loc_parts = []
+                    if first.seq is not None:
+                        loc_parts.append(f"seq {first.seq}")
+                    if first.job_id:
+                        loc_parts.append(f"job: {first.job_id}")
+                    if first.attempt_id is not None:
+                        loc_parts.append(f"attempt: {first.attempt_id}")
+                    if first.worker_id:
+                        loc_parts.append(f"worker: {first.worker_id}")
+                    loc_str = (
+                        f"seq {first.seq} ({', '.join(loc_parts[1:])})"
+                        if first.seq is not None and len(loc_parts) > 1
+                        else (", ".join(loc_parts) if loc_parts else "N/A")
+                    )
+
+                    print("\n  First Divergence:")
+                    cat_val = first.category.value if hasattr(first.category, "value") else str(first.category)
+                    print(f"    Category:                    {cat_val}")
+                    print(f"    Location:                    {loc_str}")
+                    print(f"    Expected:                    {first.expected}")
+                    print(f"    Observed:                    {first.observed}")
+                    print(f"    Summary:                     {first.message}")
+
+                if fidelity_result.summary_by_category:
+                    print("\n  Divergence Summary by Category:")
+                    for cat, count in sorted(fidelity_result.summary_by_category.items()):
+                        print(f"    {cat:<28} {count}")
+
+                print(f"\n  All Divergences ({len(fidelity_result.divergences)}):")
+                for idx, div in enumerate(fidelity_result.divergences, 1):
+                    cat_val = div.category.value if hasattr(div.category, "value") else str(div.category)
+                    seq_info = f" at seq {div.seq}" if div.seq is not None else ""
+                    print(f"    [{idx}] {cat_val}{seq_info}: {div.message}")
+
+            print("=" * 66)
+
+        return 0 if fidelity_result.equivalent else 1
+
+    # Standard replay validation
     try:
         result = ReplayEngine.replay_file(path)
     except Exception as exc:
@@ -411,7 +503,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "replay":
-        return handle_replay(trace_file=args.trace_file, json_output=args.json)
+        return handle_replay(
+            trace_file=args.trace_file,
+            json_output=args.json,
+            expected_trace_file=args.expected_trace_file,
+        )
 
     parser.print_help()
     return 0
