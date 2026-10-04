@@ -1,0 +1,48 @@
+{
+  "evaluation_id": "E6_FAILURE_COMPLEXITY",
+  "research_question": "RQ5",
+  "title": "System Stress, Concurrency Scaling, and Failure Intensity Matrix",
+  "hypothesis": "The coordinator maintains job invariants and safe recovery across scaling worker counts (2 to 4), job counts (10 to 100), and multiple sequential worker crashes without deadlocks.",
+  "dataset_source": "Stress & Scaling Workload Matrix",
+  "scenario_set": [
+    "stress-scale-small",
+    "stress-scale-medium",
+    "stress-scale-large",
+    "stress-single-failure",
+    "stress-repeated-failure",
+    "stress-retry-pressure"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1"
+  ],
+  "independent_variables": {
+    "dimension": [
+      "concurrency_scaling",
+      "workload_scaling",
+      "failure_intensity",
+      "retry_pressure"
+    ]
+  },
+  "controlled_variables": {
+    "timeout_seconds": 30.0,
+    "seed": 42,
+    "work_units": 500
+  },
+  "dependent_metrics": [
+    "execution_status",
+    "recovery_outcome",
+    "completed_jobs",
+    "failed_jobs",
+    "total_attempts",
+    "retries",
+    "worker_failures",
+    "worker_replacements",
+    "goodput_jobs_per_sec",
+    "wall_clock_duration_sec",
+    "replay_valid"
+  ],
+  "trial_count": 1,
+  "seed_policy": "deterministic: seed=42",
+  "output_artifact_dir": "research/raw/e6_failure_complexity",
+  "notes": "Bounds system behavior under concurrency and sequential fault stress."
+}

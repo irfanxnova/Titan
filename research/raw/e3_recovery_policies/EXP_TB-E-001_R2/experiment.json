@@ -1,0 +1,65 @@
+{
+  "experiment_id": "EXP_TB-E-001_R2",
+  "scenario_id": "TB-E-001",
+  "scenario_class": "CLASS_E_RETRY_PRESSURE",
+  "policy_id": "R2",
+  "policy_config": {
+    "policy_id": "R2",
+    "name": "limited-retry",
+    "description": "Worker replacement is enabled, but retry budget is strictly minimized (max_retries=1; zero retries allowed upon failure).",
+    "replace_failed_workers": true,
+    "max_retries": 1,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "base_scenario": {
+    "scenario_id": "TB-E-001",
+    "name": "retry-pressure-exhaustion",
+    "scenario_class": "CLASS_E_RETRY_PRESSURE",
+    "description": "Worker failure under max_retries=1 causing retry exhaustion and unrecovered job failure.",
+    "scenario": {
+      "name": "tb-retry-exhaustion",
+      "num_workers": 2,
+      "num_jobs": 6,
+      "work_units": 500,
+      "pattern": "uniform",
+      "seed": 42,
+      "max_retries": 1,
+      "replace_failed_workers": true,
+      "faults": [
+        {
+          "target_worker": "worker-0",
+          "kill_after_jobs": 1,
+          "target_job_id": null
+        }
+      ],
+      "duplicate_jobs": [],
+      "timeout": null
+    },
+    "expected_behavior": {
+      "expected_replay_valid": true,
+      "expected_run_state": "COMPLETED",
+      "expected_overall_status": "UNRECOVERED",
+      "expected_root_failures": 1,
+      "expected_root_class": "WORKER_FAILURE",
+      "expected_recovery_outcome": "UNRECOVERED",
+      "expected_worker_failures": 1,
+      "expected_worker_replacements": 1,
+      "min_retries": 0,
+      "max_retries": null,
+      "expected_completed_jobs": 5,
+      "expected_failed_jobs": 1,
+      "expected_duplicate_ignored": 0
+    }
+  },
+  "effective_scenario": {
+    "name": "tb-retry-exhaustion_r2",
+    "workers": 2,
+    "jobs": 6,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 1,
+    "replace_failed_workers": true
+  }
+}

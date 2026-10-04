@@ -1,0 +1,4 @@
+Workload,Workers,Jobs,Event Count,Trace Size (KB),Bytes/Event,No-Trace Mean (s),With-Trace Mean (s),Absolute Overhead (s),Relative Overhead (%)
+overhead-small,2,10,46,7.09 KB,157.9,0.1983 s,0.2062 s,+0.0080 s,+4.09%
+overhead-medium,2,50,206,32.01 KB,159.1,0.2105 s,0.2036 s,-0.0069 s,-3.16%
+overhead-large,4,100,410,63.80 KB,159.3,0.2376 s,0.2476 s,+0.0099 s,+4.19%

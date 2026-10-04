@@ -1,0 +1,232 @@
+{
+  "experiment_id": "EXP_TB-G-001_R0",
+  "scenario_id": "TB-G-001",
+  "scenario_class": "CLASS_G_CAPACITY_LOSS",
+  "policy_id": "R0",
+  "policy_config": {
+    "policy_id": "R0",
+    "name": "baseline-full-recovery",
+    "description": "Standard Titan recovery: automatic worker replacement and default retry budget (max_retries=3).",
+    "replace_failed_workers": true,
+    "max_retries": 3,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "successful_trials": 2,
+  "failed_trials": 0,
+  "recovery_rate": 1.0,
+  "metric_summaries": {
+    "wall_clock_duration_sec": {
+      "count": 2,
+      "mean": 0.1075,
+      "median": 0.1075,
+      "min": 0.0975,
+      "max": 0.1176
+    },
+    "recovery_duration_sec": {
+      "count": 2,
+      "mean": 0.0156,
+      "median": 0.0156,
+      "min": 0.0155,
+      "max": 0.0157
+    },
+    "goodput_jobs_per_sec": {
+      "count": 2,
+      "mean": 93.7941,
+      "median": 93.7941,
+      "min": 85.0611,
+      "max": 102.527
+    },
+    "avg_latency_ms": {
+      "count": 2,
+      "mean": 138.0575,
+      "median": 138.0575,
+      "min": 134.2378,
+      "max": 141.8771
+    },
+    "total_attempts": {
+      "count": 2,
+      "mean": 11.0,
+      "median": 11.0,
+      "min": 11.0,
+      "max": 11.0
+    },
+    "retries": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "duplicate_work": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "lost_work": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "completed_jobs": {
+      "count": 2,
+      "mean": 10.0,
+      "median": 10.0,
+      "min": 10.0,
+      "max": 10.0
+    },
+    "failed_jobs": {
+      "count": 2,
+      "mean": 0.0,
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "worker_replacements": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    }
+  },
+  "base_scenario_config": {},
+  "effective_scenario_config": {
+    "name": "tb-capacity-loss_r0",
+    "workers": 2,
+    "jobs": 10,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 3,
+    "replace_failed_workers": true
+  },
+  "trials": [
+    {
+      "experiment_id": "EXP_TB-G-001_R0",
+      "scenario_id": "TB-G-001",
+      "scenario_class": "CLASS_G_CAPACITY_LOSS",
+      "policy_id": "R0",
+      "policy_config": {
+        "policy_id": "R0",
+        "name": "baseline-full-recovery",
+        "description": "Standard Titan recovery: automatic worker replacement and default retry budget (max_retries=3).",
+        "replace_failed_workers": true,
+        "max_retries": 3,
+        "backoff_factor": 0.0
+      },
+      "repetition": 1,
+      "execution_status": "COMPLETED",
+      "replay_valid": true,
+      "analysis_status": "RECOVERED",
+      "total_jobs": 10,
+      "completed_jobs": 10,
+      "failed_jobs": 0,
+      "total_attempts": 11,
+      "retries": 1,
+      "duplicate_executions": 1,
+      "duplicate_completions_ignored": 0,
+      "worker_failures": 1,
+      "worker_replacements": 1,
+      "lost_work": 1,
+      "recovery_classification": "RECOVERED",
+      "execution_duration": 0.11756250000325963,
+      "failure_detection_timing": null,
+      "recovery_completion_timing": 0.015693800000008196,
+      "metrics": {
+        "recovery_rate": 1.0,
+        "unrecovered_failure_rate": 0.0,
+        "invariant_violations": 0,
+        "total_jobs": 10,
+        "completed_jobs": 10,
+        "failed_jobs": 0,
+        "total_attempts": 11,
+        "retries": 1,
+        "duplicate_work": 1,
+        "lost_work": 1,
+        "retry_overhead": 0.1,
+        "duplicate_completions_ignored": 0,
+        "worker_failures": 1,
+        "worker_replacements": 1,
+        "recovery_classification": "RECOVERED",
+        "recovery_duration_sec": 0.015694,
+        "wall_clock_duration_sec": 0.117563,
+        "goodput_jobs_per_sec": 85.06,
+        "avg_latency_ms": 141.877,
+        "p50_latency_ms": 138.457,
+        "p95_latency_ms": 161.714,
+        "p99_latency_ms": 176.831
+      },
+      "artifacts": {
+        "trace": "research\\raw\\e3_recovery_policies\\EXP_TB-G-001_R0\\trials\\trace-001.json",
+        "trial": "research\\raw\\e3_recovery_policies\\EXP_TB-G-001_R0\\trials\\trial-001.json"
+      },
+      "validation_errors": []
+    },
+    {
+      "experiment_id": "EXP_TB-G-001_R0",
+      "scenario_id": "TB-G-001",
+      "scenario_class": "CLASS_G_CAPACITY_LOSS",
+      "policy_id": "R0",
+      "policy_config": {
+        "policy_id": "R0",
+        "name": "baseline-full-recovery",
+        "description": "Standard Titan recovery: automatic worker replacement and default retry budget (max_retries=3).",
+        "replace_failed_workers": true,
+        "max_retries": 3,
+        "backoff_factor": 0.0
+      },
+      "repetition": 2,
+      "execution_status": "COMPLETED",
+      "replay_valid": true,
+      "analysis_status": "RECOVERED",
+      "total_jobs": 10,
+      "completed_jobs": 10,
+      "failed_jobs": 0,
+      "total_attempts": 11,
+      "retries": 1,
+      "duplicate_executions": 1,
+      "duplicate_completions_ignored": 0,
+      "worker_failures": 1,
+      "worker_replacements": 1,
+      "lost_work": 1,
+      "recovery_classification": "RECOVERED",
+      "execution_duration": 0.09753529999579769,
+      "failure_detection_timing": null,
+      "recovery_completion_timing": 0.015542200002528261,
+      "metrics": {
+        "recovery_rate": 1.0,
+        "unrecovered_failure_rate": 0.0,
+        "invariant_violations": 0,
+        "total_jobs": 10,
+        "completed_jobs": 10,
+        "failed_jobs": 0,
+        "total_attempts": 11,
+        "retries": 1,
+        "duplicate_work": 1,
+        "lost_work": 1,
+        "retry_overhead": 0.1,
+        "duplicate_completions_ignored": 0,
+        "worker_failures": 1,
+        "worker_replacements": 1,
+        "recovery_classification": "RECOVERED",
+        "recovery_duration_sec": 0.015542,
+        "wall_clock_duration_sec": 0.097535,
+        "goodput_jobs_per_sec": 102.53,
+        "avg_latency_ms": 134.238,
+        "p50_latency_ms": 132.204,
+        "p95_latency_ms": 145.742,
+        "p99_latency_ms": 154.272
+      },
+      "artifacts": {
+        "trace": "research\\raw\\e3_recovery_policies\\EXP_TB-G-001_R0\\trials\\trace-002.json",
+        "trial": "research\\raw\\e3_recovery_policies\\EXP_TB-G-001_R0\\trials\\trial-002.json"
+      },
+      "validation_errors": []
+    }
+  ]
+}

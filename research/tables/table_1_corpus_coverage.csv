@@ -1,0 +1,10 @@
+Scenario ID,Scenario Name,Class,Workers,Jobs,Fault Injection,Max Retries,Expected Outcome,Expected Root Class
+TB-A-001,baseline-normal-execution,CLASS_A_BASELINE,2,10,None,3,CLEAN,None
+TB-B-001,single-worker-failure-recovery,CLASS_B_SINGLE_WORKER_FAILURE,2,10,Active,3,RECOVERED,WORKER_FAILURE
+TB-C-001,in-flight-worker-failure,CLASS_C_IN_FLIGHT_FAILURE,2,8,Active,3,RECOVERED,WORKER_FAILURE
+TB-D-001,repeated-sequential-failures,CLASS_D_REPEATED_FAILURE,3,15,Active,3,RECOVERED,WORKER_FAILURE
+TB-E-001,retry-pressure-exhaustion,CLASS_E_RETRY_PRESSURE,2,6,Active,1,UNRECOVERED,WORKER_FAILURE
+TB-F-001,duplicate-result-suppression,CLASS_F_DUPLICATE_STALE,2,10,None,3,CLEAN,None
+TB-G-001,unreplaced-worker-capacity-loss,CLASS_G_CAPACITY_LOSS,2,10,Active,3,RECOVERED,WORKER_FAILURE
+TB-H-001,adversarial-first-job-kill,CLASS_H_ADVERSARIAL_TIMING,2,8,Active,3,RECOVERED,WORKER_FAILURE
+TB-I-001,large-scale-baseline-workload,CLASS_I_LARGE_WORKLOAD,4,40,None,3,CLEAN,None

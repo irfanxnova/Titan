@@ -1,0 +1,55 @@
+{
+  "trace_name": "tb_b_worker_crash",
+  "trace_source": "TB-B-001",
+  "trace_event_count": 53,
+  "trace_size_bytes": 8346,
+  "repetitions": 3,
+  "replay_duration_stats": {
+    "count": 3,
+    "mean": 0.0001,
+    "median": 0.0001,
+    "min": 0.0001,
+    "max": 0.0001
+  },
+  "replay_throughput_stats": {
+    "count": 3,
+    "mean": 909449.7597,
+    "median": 890756.2733,
+    "min": 887772.1426,
+    "max": 949820.8633
+  },
+  "replay_valid": true,
+  "validation_errors": [],
+  "trials": [
+    {
+      "trace_name": "tb_b_worker_crash",
+      "trial_index": 1,
+      "trace_event_count": 53,
+      "trace_size_bytes": 8346,
+      "replay_duration_sec": 6e-05,
+      "replay_events_per_sec": 887772.14,
+      "replay_valid": true,
+      "validation_error_count": 0
+    },
+    {
+      "trace_name": "tb_b_worker_crash",
+      "trial_index": 2,
+      "trace_event_count": 53,
+      "trace_size_bytes": 8346,
+      "replay_duration_sec": 6e-05,
+      "replay_events_per_sec": 890756.27,
+      "replay_valid": true,
+      "validation_error_count": 0
+    },
+    {
+      "trace_name": "tb_b_worker_crash",
+      "trial_index": 3,
+      "trace_event_count": 53,
+      "trace_size_bytes": 8346,
+      "replay_duration_sec": 5.6e-05,
+      "replay_events_per_sec": 949820.86,
+      "replay_valid": true,
+      "validation_error_count": 0
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 420" width="100%" height="100%">
+<rect width="740" height="420" fill="#ffffff" rx="6"/>
+<text x="370.0" y="28" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#1e293b">FIGURE 3: Deterministic Replay Duration vs. Event Scale (RQ4, RQ5)</text>
+<text x="370.0" y="46" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Sub-millisecond Replay Reconstruction Across Canonical Traces</text>
+<line x1="80" y1="350.0" x2="690" y2="350.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="354.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.00 ms</text>
+<line x1="80" y1="292.0" x2="690" y2="292.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="296.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.13 ms</text>
+<line x1="80" y1="234.0" x2="690" y2="234.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="238.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.26 ms</text>
+<line x1="80" y1="176.0" x2="690" y2="176.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="180.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.39 ms</text>
+<line x1="80" y1="118.0" x2="690" y2="118.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="122.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.52 ms</text>
+<line x1="80" y1="60.0" x2="690" y2="60.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="64.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.65 ms</text>
+<line x1="80.0" y1="350" x2="80.0" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="80.0" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0</text>
+<line x1="181.66666666666666" y1="350" x2="181.66666666666666" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="181.66666666666666" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">20</text>
+<line x1="283.3333333333333" y1="350" x2="283.3333333333333" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="283.3333333333333" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">40</text>
+<line x1="385.0" y1="350" x2="385.0" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="385.0" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">60</text>
+<line x1="486.66666666666663" y1="350" x2="486.66666666666663" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="486.66666666666663" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">80</text>
+<line x1="588.3333333333334" y1="350" x2="588.3333333333334" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="588.3333333333334" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">100</text>
+<line x1="690.0" y1="350" x2="690.0" y2="355" stroke="#94a3b8" stroke-width="1"/>
+<text x="690.0" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">120</text>
+<line x1="80" y1="60" x2="80" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+<line x1="80" y1="350" x2="690" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+<path d="M 313.8 327.2 L 349.4 324.0 L 496.8 311.1" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="4,4"/>
+<circle cx="313.83333333333337" cy="327.1569233510094" r="6" fill="#0d9488" stroke="#ffffff" stroke-width="2"/>
+<text x="313.83333333333337" y="315.1569233510094" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">0.051 ms</text>
+<text x="313.83333333333337" y="349.1569233510094" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">tb_a_baseline (898,834 ev/s)</text>
+<circle cx="349.4166666666667" cy="323.97435882027287" r="6" fill="#0d9488" stroke="#ffffff" stroke-width="2"/>
+<text x="349.4166666666667" y="311.97435882027287" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">0.058 ms</text>
+<text x="349.4166666666667" y="345.97435882027287" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">tb_b_worker_crash (909,450 ev/s)</text>
+<circle cx="496.8333333333333" cy="311.0507691380544" r="6" fill="#0d9488" stroke="#ffffff" stroke-width="2"/>
+<text x="496.8333333333333" y="299.0507691380544" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">0.087 ms</text>
+<text x="496.8333333333333" y="333.0507691380544" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">tb_d_repeated_failure (940,268 ev/s)</text>
+<text x="370.0" y="405" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#1e293b">Trace Event Count (Chronological Events)</text>
+</svg>

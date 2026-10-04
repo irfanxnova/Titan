@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 420" width="100%" height="100%">
+<rect width="740" height="420" fill="#ffffff" rx="6"/>
+<text x="370.0" y="28" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#1e293b">FIGURE 4: System Goodput Scaling Across Concurrency & Workloads (RQ5)</text>
+<text x="370.0" y="46" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Primary Throughput (Completed Unique Jobs / Second) Under Static Runtime</text>
+<line x1="80" y1="350.0" x2="690" y2="350.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="354.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0 j/s</text>
+<line x1="80" y1="292.0" x2="690" y2="292.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="296.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">105 j/s</text>
+<line x1="80" y1="234.0" x2="690" y2="234.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="238.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">210 j/s</text>
+<line x1="80" y1="175.99999999999997" x2="690" y2="175.99999999999997" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="179.99999999999997" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">315 j/s</text>
+<line x1="80" y1="118.0" x2="690" y2="118.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="122.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">420 j/s</text>
+<line x1="80" y1="60.0" x2="690" y2="60.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="64.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">525 j/s</text>
+<line x1="80" y1="60" x2="80" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+<line x1="80" y1="350" x2="690" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="159.16666666666669" y="324.2173032746195" width="45.0" height="25.782696725380507" fill="#2563eb" rx="4"/>
+<text x="181.66666666666669" y="316.2173032746195" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#2563eb">46.6 j/s</text>
+<text x="181.66666666666669" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">stress-scale-small</text>
+<text x="181.66666666666669" y="382" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">10 jobs (2 workers)</text>
+<rect x="362.50000000000006" y="215.87218062901536" width="45.0" height="134.12781937098464" fill="#0d9488" rx="4"/>
+<text x="385.00000000000006" y="207.87218062901536" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0d9488">242.6 j/s</text>
+<text x="385.00000000000006" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">stress-scale-medium</text>
+<text x="385.00000000000006" y="382" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">50 jobs (2 workers)</text>
+<rect x="565.8333333333334" y="118.0" width="45.0" height="232.0" fill="#2563eb" rx="4"/>
+<text x="588.3333333333334" y="110.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#2563eb">419.6 j/s</text>
+<text x="588.3333333333334" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">stress-scale-large</text>
+<text x="588.3333333333334" y="382" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">100 jobs (4 workers)</text>
+<text x="370.0" y="405" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#1e293b">Workload Scale & Worker Concurrency Configurations</text>
+</svg>

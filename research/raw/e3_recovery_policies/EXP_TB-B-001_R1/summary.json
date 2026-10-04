@@ -1,0 +1,232 @@
+{
+  "experiment_id": "EXP_TB-B-001_R1",
+  "scenario_id": "TB-B-001",
+  "scenario_class": "CLASS_B_SINGLE_WORKER_FAILURE",
+  "policy_id": "R1",
+  "policy_config": {
+    "policy_id": "R1",
+    "name": "no-worker-replacement",
+    "description": "Failed workers are not replaced (replace_failed_workers=False); remaining workers process retried jobs under degraded capacity.",
+    "replace_failed_workers": false,
+    "max_retries": 3,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "successful_trials": 2,
+  "failed_trials": 0,
+  "recovery_rate": 1.0,
+  "metric_summaries": {
+    "wall_clock_duration_sec": {
+      "count": 2,
+      "mean": 0.0862,
+      "median": 0.0862,
+      "min": 0.0839,
+      "max": 0.0886
+    },
+    "recovery_duration_sec": {
+      "count": 2,
+      "mean": 0.0009,
+      "median": 0.0009,
+      "min": 0.0007,
+      "max": 0.0012
+    },
+    "goodput_jobs_per_sec": {
+      "count": 2,
+      "mean": 116.0828,
+      "median": 116.0828,
+      "min": 112.9182,
+      "max": 119.2474
+    },
+    "avg_latency_ms": {
+      "count": 2,
+      "mean": 141.7333,
+      "median": 141.7333,
+      "min": 139.5094,
+      "max": 143.9571
+    },
+    "total_attempts": {
+      "count": 2,
+      "mean": 11.0,
+      "median": 11.0,
+      "min": 11.0,
+      "max": 11.0
+    },
+    "retries": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "duplicate_work": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "lost_work": {
+      "count": 2,
+      "mean": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "completed_jobs": {
+      "count": 2,
+      "mean": 10.0,
+      "median": 10.0,
+      "min": 10.0,
+      "max": 10.0
+    },
+    "failed_jobs": {
+      "count": 2,
+      "mean": 0.0,
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "worker_replacements": {
+      "count": 2,
+      "mean": 0.0,
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    }
+  },
+  "base_scenario_config": {},
+  "effective_scenario_config": {
+    "name": "tb-single-worker-fail_r1",
+    "workers": 2,
+    "jobs": 10,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 3,
+    "replace_failed_workers": false
+  },
+  "trials": [
+    {
+      "experiment_id": "EXP_TB-B-001_R1",
+      "scenario_id": "TB-B-001",
+      "scenario_class": "CLASS_B_SINGLE_WORKER_FAILURE",
+      "policy_id": "R1",
+      "policy_config": {
+        "policy_id": "R1",
+        "name": "no-worker-replacement",
+        "description": "Failed workers are not replaced (replace_failed_workers=False); remaining workers process retried jobs under degraded capacity.",
+        "replace_failed_workers": false,
+        "max_retries": 3,
+        "backoff_factor": 0.0
+      },
+      "repetition": 1,
+      "execution_status": "COMPLETED",
+      "replay_valid": true,
+      "analysis_status": "RECOVERED",
+      "total_jobs": 10,
+      "completed_jobs": 10,
+      "failed_jobs": 0,
+      "total_attempts": 11,
+      "retries": 1,
+      "duplicate_executions": 1,
+      "duplicate_completions_ignored": 0,
+      "worker_failures": 1,
+      "worker_replacements": 0,
+      "lost_work": 1,
+      "recovery_classification": "RECOVERED",
+      "execution_duration": 0.08855970000149682,
+      "failure_detection_timing": null,
+      "recovery_completion_timing": 0.0007110999940778129,
+      "metrics": {
+        "recovery_rate": 1.0,
+        "unrecovered_failure_rate": 0.0,
+        "invariant_violations": 0,
+        "total_jobs": 10,
+        "completed_jobs": 10,
+        "failed_jobs": 0,
+        "total_attempts": 11,
+        "retries": 1,
+        "duplicate_work": 1,
+        "lost_work": 1,
+        "retry_overhead": 0.1,
+        "duplicate_completions_ignored": 0,
+        "worker_failures": 1,
+        "worker_replacements": 0,
+        "recovery_classification": "RECOVERED",
+        "recovery_duration_sec": 0.000711,
+        "wall_clock_duration_sec": 0.08856,
+        "goodput_jobs_per_sec": 112.92,
+        "avg_latency_ms": 143.957,
+        "p50_latency_ms": 143.092,
+        "p95_latency_ms": 156.56,
+        "p99_latency_ms": 165.048
+      },
+      "artifacts": {
+        "trace": "research\\raw\\e3_recovery_policies\\EXP_TB-B-001_R1\\trials\\trace-001.json",
+        "trial": "research\\raw\\e3_recovery_policies\\EXP_TB-B-001_R1\\trials\\trial-001.json"
+      },
+      "validation_errors": []
+    },
+    {
+      "experiment_id": "EXP_TB-B-001_R1",
+      "scenario_id": "TB-B-001",
+      "scenario_class": "CLASS_B_SINGLE_WORKER_FAILURE",
+      "policy_id": "R1",
+      "policy_config": {
+        "policy_id": "R1",
+        "name": "no-worker-replacement",
+        "description": "Failed workers are not replaced (replace_failed_workers=False); remaining workers process retried jobs under degraded capacity.",
+        "replace_failed_workers": false,
+        "max_retries": 3,
+        "backoff_factor": 0.0
+      },
+      "repetition": 2,
+      "execution_status": "COMPLETED",
+      "replay_valid": true,
+      "analysis_status": "RECOVERED",
+      "total_jobs": 10,
+      "completed_jobs": 10,
+      "failed_jobs": 0,
+      "total_attempts": 11,
+      "retries": 1,
+      "duplicate_executions": 1,
+      "duplicate_completions_ignored": 0,
+      "worker_failures": 1,
+      "worker_replacements": 0,
+      "lost_work": 1,
+      "recovery_classification": "RECOVERED",
+      "execution_duration": 0.08385930000076769,
+      "failure_detection_timing": null,
+      "recovery_completion_timing": 0.001180699997348711,
+      "metrics": {
+        "recovery_rate": 1.0,
+        "unrecovered_failure_rate": 0.0,
+        "invariant_violations": 0,
+        "total_jobs": 10,
+        "completed_jobs": 10,
+        "failed_jobs": 0,
+        "total_attempts": 11,
+        "retries": 1,
+        "duplicate_work": 1,
+        "lost_work": 1,
+        "retry_overhead": 0.1,
+        "duplicate_completions_ignored": 0,
+        "worker_failures": 1,
+        "worker_replacements": 0,
+        "recovery_classification": "RECOVERED",
+        "recovery_duration_sec": 0.001181,
+        "wall_clock_duration_sec": 0.083859,
+        "goodput_jobs_per_sec": 119.25,
+        "avg_latency_ms": 139.509,
+        "p50_latency_ms": 138.819,
+        "p95_latency_ms": 149.802,
+        "p99_latency_ms": 156.783
+      },
+      "artifacts": {
+        "trace": "research\\raw\\e3_recovery_policies\\EXP_TB-B-001_R1\\trials\\trace-002.json",
+        "trial": "research\\raw\\e3_recovery_policies\\EXP_TB-B-001_R1\\trials\\trial-002.json"
+      },
+      "validation_errors": []
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "evaluation_id": "E2_FAILURE_DIAGNOSIS",
+  "research_question": "RQ2",
+  "title": "Automated Failure Classification and Root-Cause Localization Accuracy",
+  "hypothesis": "Structured event traces analyzed via Titan's FailureAnalyzer correctly identify injected ground-truth root causes, affected entities, and recovery outcomes without human subjective inspection.",
+  "dataset_source": "TitanBench Canonical Failure Corpus (Classes A, B, C, D, E, G)",
+  "scenario_set": [
+    "TB-A-001",
+    "TB-B-001",
+    "TB-C-001",
+    "TB-D-001",
+    "TB-E-001",
+    "TB-G-001"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1"
+  ],
+  "independent_variables": {
+    "failure_scenario": [
+      "baseline_clean",
+      "single_worker_crash",
+      "in_flight_crash",
+      "repeated_worker_crash",
+      "retry_exhaustion",
+      "capacity_loss"
+    ]
+  },
+  "controlled_variables": {
+    "failure_analyzer": "titan.analysis.FailureAnalyzer",
+    "ground_truth_oracle": "titan.bench.corpus.ExpectedBehavior"
+  },
+  "dependent_metrics": [
+    "root_class_classification_accuracy",
+    "affected_entity_localization_accuracy",
+    "recovery_status_assessment_accuracy",
+    "diagnosis_consistency_across_trials"
+  ],
+  "trial_count": 3,
+  "seed_policy": "deterministic: seed=42",
+  "output_artifact_dir": "research/raw/e2_failure_diagnosis",
+  "notes": "Evaluates diagnostic correctness against known injected ground-truth failures."
+}

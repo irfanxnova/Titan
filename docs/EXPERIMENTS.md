@@ -358,4 +358,78 @@ python src/titan/cli.py evaluate stress [--timeout 30] [--json]
 python src/titan/cli.py evaluate all [--trials 3] [--json]
 ```
 
+---
+
+## 9. Milestone 11: Research-Grade Evaluation, Baselines, Ablations & Reproducible Results
+
+Milestone 11 formalizes Titan's empirical evaluation layer into a coherent, publication-grade research framework answering RQ1 through RQ6 with machine-readable evidence, controlled baselines, mechanism ablations, and reproducible artifacts.
+
+### 9.1 Research Questions & Empirical Mapping
+
+| Research Question | Empirical Inquiry | Evaluated Suites | Key Findings (Observed) |
+|:---|:---|:---:|:---|
+| **RQ1 — Replay Fidelity** | How reliably can Titan reproduce the same logical failure and execution history? | **Suite E1** | 100.0% equivalence on clean and worker-crash traces; 100.0% divergence detection on tampered/corrupted traces. |
+| **RQ2 — Failure Diagnosis** | Does structured replay improve failure localization and root-cause classification? | **Suite E2** | 100.0% root-cause classification accuracy, 100.0% affected entity localization, and 100.0% recovery status accuracy against injected ground truth across TitanBench Classes A, B, C, D, E, G. |
+| **RQ3 — Recovery Policies** | How do different recovery policies affect recovery rate, work efficiency, and goodput? | **Suite E3** | Resilient Policy R0 achieves 100% recovery across all crash scenarios; degraded capacity Policy R1 preserves recovery with -15% to -25% duration impact; Policy R2 (limited retry) suffers complete unrecovered failure (0% recovery) under transient crashes. |
+| **RQ4 — Instrumentation Cost** | How much wall-clock and disk overhead does structured event tracing impose? | **Suite E4 & E5** | Trace serialization footprint is strictly linear: 156–158 bytes per lifecycle event. Wall-clock overhead ranges from +4% to +12% on multi-job batches. Offline replay executes in <0.1ms with >800,000 ev/s throughput. |
+| **RQ5 — Failure Complexity** | How does system behavior change as workers, jobs, retries, and failures scale? | **Suite E5 & E6** | Multi-worker parallel scaling yields 400+ jobs/s goodput (100 jobs on 4 workers). Sequential multi-worker crash injection recovers cleanly without orphaned worker processes or deadlocks. |
+| **RQ6 — Mitigation Quality** | Which architectural mechanisms improve recovery without unacceptable retry costs? | **Suite E3 & E7** | Retry budget and worker replacement are the necessary and sufficient pair for full recovery. Ablating retries (A2) causes a 100% drop in recovery rate, while ablating worker replacement (A1) reduces system capacity. |
+
+### 9.2 Controlled Baselines
+
+- **BASELINE-B0**: Normal execution with zero injected failures (establishes baseline throughput and latency).
+- **BASELINE-B1**: Standard Titan recovery policy (`R0`: automatic worker replacement, max retries = 3).
+- **BASELINE-B2**: No-trace execution (`enable_tracing=False`) for computing pure instrumentation overhead.
+- **BASELINE-B3**: Alternative recovery policies (`R1`: degraded capacity, `R2`: limited retry, `R3`: fail-fast).
+
+### 9.3 Mechanism Ablations (A1–A5)
+
+| Ablation | Mechanism Name | Baseline Config | Ablated Config | Affected Scenario | Primary Metric | Observed Delta | Impact Assessment |
+|:---:|:---|:---|:---|:---:|:---|:---:|:---:|
+| **A1** | Worker Replacement | Policy R0 (`replace=True`) | Policy R1 (`replace=False`) | `TB-B-001` | Goodput (j/s) | +30.8 j/s (no spawn) | TRADE_OFF |
+| **A2** | Retry Budget | Policy R0 (`max_retries=3`) | Policy R2 (`max_retries=1`) | `TB-E-001` | Recovery Rate | -100.0% (Failed) | WORSENED |
+| **A3** | Event Tracing | Active (`enable_tracing=True`) | Disabled (`enable_tracing=False`) | `overhead-medium` | Duration (s) | -0.002 s (-1.0%) | TRADE_OFF |
+| **A4** | Replay Invariant Checks | Strict Graph & Invariants | Shallow Event Loop | `TB-B-001-trace` | Replay Time (s) | -0.0001 s | TRADE_OFF |
+| **A5** | Resilient Policy vs Fail-Fast | Policy R0 (Restart + Retry) | Policy R3 (Minimal Recovery) | `TB-B-001` | Recovery Rate | -100.0% (Failed) | WORSENED |
+
+### 9.4 Reproducible Result Package (`research/`)
+
+```
+research/
+├── plans/               # JSON evaluation plan specifications (E1-E7)
+├── runs/                # Sanitized execution environment metadata
+├── raw/                 # Machine-readable trial records
+│   ├── e1_replay_fidelity/
+│   ├── e2_failure_diagnosis/
+│   ├── e3_recovery_policies/
+│   └── ablations/
+├── summaries/           # Aggregate numerical summary JSON files
+├── tables/              # Tables 1–8 in Markdown (.md) and CSV (.csv)
+├── figures/             # Figures 1–5 in vector SVG with companion data JSON
+└── reports/             # Comprehensive research report (titan_research_report.md)
+```
+
+### 9.5 CLI Usage for Research
+
+```bash
+# 1. Execute all canonical research evaluation suites and generate package
+python src/titan/cli.py research run [--trials 3] [--output-dir research] [--json]
+
+# 2. Verify reproducibility of generated research artifacts
+python src/titan/cli.py research verify [--dir research] [--json]
+
+# 3. List all registered canonical evaluation plans
+python src/titan/cli.py research list-plans [--json]
+
+# 4. Display or inspect generated research report
+python src/titan/cli.py research report [--output-dir research] [--json]
+
+# 5. List and inspect generated summary tables (Markdown & CSV)
+python src/titan/cli.py research tables [--output-dir research] [--json]
+
+# 6. List and inspect generated publication figures (SVG)
+python src/titan/cli.py research figures [--output-dir research] [--json]
+```
+
+
 

@@ -1,0 +1,63 @@
+{
+  "config": {
+    "name": "stress-single-failure",
+    "category": "failure_intensity",
+    "workers": 2,
+    "jobs": 20,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 3,
+    "replace_failed_workers": true,
+    "timeout": 30.0,
+    "has_fault": true
+  },
+  "repetitions": 1,
+  "successful_trials": 1,
+  "recovery_rate": 1.0,
+  "execution_duration_stats": {
+    "count": 1,
+    "mean": 0.2998,
+    "median": 0.2998,
+    "min": 0.2998,
+    "max": 0.2998
+  },
+  "replay_duration_stats": {
+    "count": 1,
+    "mean": 0.0001,
+    "median": 0.0001,
+    "min": 0.0001,
+    "max": 0.0001
+  },
+  "goodput_stats": {
+    "count": 1,
+    "mean": 66.704,
+    "median": 66.704,
+    "min": 66.704,
+    "max": 66.704
+  },
+  "trials": [
+    {
+      "config_name": "stress-single-failure",
+      "category": "failure_intensity",
+      "trial_index": 1,
+      "workers": 2,
+      "jobs": 20,
+      "work_units": 500,
+      "execution_status": "COMPLETED",
+      "recovery_outcome": "RECOVERED",
+      "completed_jobs": 20,
+      "failed_jobs": 0,
+      "total_attempts": 21,
+      "retries": 1,
+      "worker_failures": 1,
+      "worker_replacements": 1,
+      "trace_event_count": 93,
+      "trace_size_bytes": 14705,
+      "replay_valid": true,
+      "replay_duration_sec": 0.000147,
+      "wall_clock_duration_sec": 0.299832,
+      "goodput_jobs_per_sec": 66.704
+    }
+  ]
+}

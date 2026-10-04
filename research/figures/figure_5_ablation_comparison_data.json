@@ -1,0 +1,115 @@
+[
+  {
+    "ablation_id": "A1",
+    "mechanism_name": "Worker Process Replacement",
+    "target_research_question": "RQ3, RQ6",
+    "scenario_id": "TB-B-001",
+    "baseline_config_name": "Policy R0 (replace_failed_workers=True)",
+    "ablated_config_name": "Policy R1 (replace_failed_workers=False)",
+    "baseline_config": {
+      "replace_failed_workers": true,
+      "max_retries": 3
+    },
+    "ablated_config": {
+      "replace_failed_workers": false,
+      "max_retries": 3
+    },
+    "primary_metric": "goodput_jobs_per_sec",
+    "baseline_value": 88.7174,
+    "ablated_value": 119.5616,
+    "delta": 30.8443,
+    "relative_change_pct": 34.7669,
+    "impact_assessment": "IMPROVED",
+    "mechanism_contribution": "Worker replacement prevents worker pool exhaustion and preserves multi-worker processing parallelism after failures."
+  },
+  {
+    "ablation_id": "A2",
+    "mechanism_name": "Retry Budget",
+    "target_research_question": "RQ3, RQ6",
+    "scenario_id": "TB-E-001",
+    "baseline_config_name": "Policy R0 (max_retries=3)",
+    "ablated_config_name": "Policy R2 (max_retries=1)",
+    "baseline_config": {
+      "max_retries": 3,
+      "replace_failed_workers": true
+    },
+    "ablated_config": {
+      "max_retries": 1,
+      "replace_failed_workers": true
+    },
+    "primary_metric": "recovery_rate",
+    "baseline_value": 1.0,
+    "ablated_value": 0.0,
+    "delta": -1.0,
+    "relative_change_pct": -100.0,
+    "impact_assessment": "WORSENED",
+    "mechanism_contribution": "Adequate retry budget allows transient failures to be recovered; truncating retries to 1 causes permanent job loss."
+  },
+  {
+    "ablation_id": "A3",
+    "mechanism_name": "Deterministic Event Tracing",
+    "target_research_question": "RQ4",
+    "scenario_id": "overhead-medium",
+    "baseline_config_name": "Tracing Active (enable_tracing=True)",
+    "ablated_config_name": "Tracing Disabled (enable_tracing=False)",
+    "baseline_config": {
+      "enable_tracing": true
+    },
+    "ablated_config": {
+      "enable_tracing": false
+    },
+    "primary_metric": "wall_clock_duration_sec",
+    "baseline_value": 0.2086,
+    "ablated_value": 0.2064,
+    "delta": -0.0022,
+    "relative_change_pct": -1.0322,
+    "impact_assessment": "TRADE_OFF",
+    "mechanism_contribution": "Disabling tracing slightly reduces coordinator serialization overhead, but completely eliminates replayability, failure diagnosis, and execution telemetry."
+  },
+  {
+    "ablation_id": "A4",
+    "mechanism_name": "Replay Invariant Verification",
+    "target_research_question": "RQ1, RQ4",
+    "scenario_id": "TB-B-001-trace",
+    "baseline_config_name": "Strict Replay Validation (Graph + Invariants)",
+    "ablated_config_name": "Shallow Replay (Event Iteration Only)",
+    "baseline_config": {
+      "replay_mode": "strict_graph_and_invariants"
+    },
+    "ablated_config": {
+      "replay_mode": "shallow_event_loop"
+    },
+    "primary_metric": "replay_duration_sec",
+    "baseline_value": 0.0001,
+    "ablated_value": 0.0,
+    "delta": -0.0001,
+    "relative_change_pct": -97.7029,
+    "impact_assessment": "TRADE_OFF",
+    "mechanism_contribution": "Strict invariant checking adds microsecond-scale computation while preventing undetected state corruption, deadlocks, and ownership leaks."
+  },
+  {
+    "ablation_id": "A5",
+    "mechanism_name": "Resilient Recovery Policy vs Fail-Fast",
+    "target_research_question": "RQ3, RQ6",
+    "scenario_id": "TB-B-001",
+    "baseline_config_name": "Policy R0 (Full Recovery)",
+    "ablated_config_name": "Policy R3 (Minimal Recovery / Fail-Fast)",
+    "baseline_config": {
+      "policy_id": "R0",
+      "max_retries": 3,
+      "replace_failed_workers": true
+    },
+    "ablated_config": {
+      "policy_id": "R3",
+      "max_retries": 1,
+      "replace_failed_workers": false
+    },
+    "primary_metric": "recovery_rate",
+    "baseline_value": 1.0,
+    "ablated_value": 0.0,
+    "delta": -1.0,
+    "relative_change_pct": -100.0,
+    "impact_assessment": "WORSENED",
+    "mechanism_contribution": "Combining worker replacement and retry budget ensures 100% completion; removing both causes immediate failure upon process crash."
+  }
+]

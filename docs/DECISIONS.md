@@ -402,6 +402,73 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Provides an objective, reproducible, and automated harness to quantify tracing overhead and replay scaling costs; separates logical determinism from physical timing variation; prepares empirical measurement artifacts for Prompt 11.
   - *Negative*: Repeated multi-process executions under Windows incur process spawn overhead; timing measurements exhibit natural OS scheduling variance that must be reported transparently rather than smoothed artificially.
 
+---
+
+## ADR-021: Research-Grade Evaluation, Baselines, Ablations, and Reproducibility Architecture
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Across Prompts 1–10, Titan implemented core execution primitives, deterministic fault injection, canonical event tracing, offline replay, fidelity verification, root-cause failure analysis, the TitanBench corpus, and measurement infrastructure. To transition Titan from a functional systems prototype into a publication-grade experimental research platform, the system must answer core research questions (RQ1–RQ6) with reproducible, machine-readable evidence, controlled baselines, systematic ablations, and automated artifact generation.
+- **Decision**:
+  1. **Evaluation Plan Abstraction (`titan.research.plan`)**:
+     - Formalize `EvaluationPlan` as an explicit, serializable dataclass defining: evaluation ID, research question, title, hypothesis/objective, dataset source, scenario set, policies/baselines, independent/controlled variables, dependent metrics, trial counts, seed policy, and artifact paths.
+     - Establish `ResearchPlanRegistry` containing authoritative canonical plans: `E1_REPLAY_FIDELITY` (RQ1), `E2_FAILURE_DIAGNOSIS` (RQ2), `E3_RECOVERY_POLICIES` (RQ3, RQ6), `E4_TRACING_OVERHEAD` (RQ4), `E5_REPLAY_COST` (RQ4, RQ5), `E6_FAILURE_COMPLEXITY` (RQ5), and `E7_SYSTEM_ABLATIONS` (RQ6).
+  2. **Authoritative Baselines (`titan.research.baselines`)**:
+     - Register explicit baselines: `BASELINE-B0` (clean execution without faults), `BASELINE-B1` (standard Titan recovery policy R0), `BASELINE-B2` (no-trace execution for overhead calculation), and `BASELINE-B3` (alternative recovery policies R1, R2, R3).
+     - Every comparison must explicitly reference its baseline configuration.
+  3. **Structured Mechanism Ablations (`titan.research.ablations`)**:
+     - Implement 5 canonical mechanism ablations:
+       - `A1`: No Worker Replacement (`replace_failed_workers=False`).
+       - `A2`: Limited Retries (`max_retries=1`).
+       - `A3`: No Deterministic Tracing (`enable_tracing=False`).
+       - `A4`: Relaxed Replay Verification (skipping state graph and invariant validation).
+       - `A5`: Minimal Fail-Fast Recovery (Policy `R3`).
+     - Record baseline vs. ablated metrics, deltas, relative change %, and qualitative impact assessments (`IMPROVED`, `WORSENED`, `TRADE_OFF`, `NEUTRAL`).
+  4. **Transparent Descriptive Statistics (`titan.research.stats`)**:
+     - Compute sample size $N$, mean, median, min, max, standard deviation, and coefficient of variation ($CV$).
+     - Avoid fabricated inferential statistics, confidence intervals, or cosmetic hypothesis tests.
+     - Provide zero-denominator protections for normalization ratios and relative percentage changes.
+  5. **Anonymized Environment Capture (`titan.research.environment`)**:
+     - Capture OS, Python version, Titan version, processor, and CPU thread count.
+     - Scrub user-private directories and absolute filesystem paths in research artifacts via `sanitize_path()`.
+  6. **Automated Table & Figure Generation (`titan.research.tables`, `titan.research.figures`)**:
+     - Automatically render 8 tables in both Markdown and CSV formats from raw experimental results.
+     - Automatically render 5 publication-style vector SVG figures directly using pure standard-library string templating (zero third-party plotting dependencies), preserving underlying numerical data in companion JSON files.
+  7. **Automated Research Report (`titan.research.report`)**:
+     - Compile `titan_research_report.md` with explicit sections distinguishing `OBSERVATION` (what measurements show), `INTERPRETATION` (engineering inferences), and `LIMITATION` (validity boundaries).
+  8. **Reproducibility Validation Routine (`titan.research.reproducibility`)**:
+     - Implement `verify_reproducibility()` checking plan integrity, JSON schemas, logical/categorical determinism, file presence, and non-empty byte lengths.
+  9. **Master Orchestrator and CLI (`titan.research.orchestrator`, `titan.cli`)**:
+     - Coordinate the end-to-end pipeline through `ResearchOrchestrator` and expose commands via `titan research run`, `verify`, `list-plans`, `report`, `tables`, and `figures`.
+- **Consequences**:
+  - *Positive*: Converts Titan into a self-contained, reproducible experimental research platform; enables external reviewers to verify all research claims with a single CLI command; maintains zero external dependencies; ensures rigorous research claims grounded in machine-readable evidence.
+  - *Negative*: Running the complete multi-trial suite requires non-trivial CPU execution time (~30–45 seconds).
+
+---
+
+## ADR-022: Final System Architecture Freeze, Verification Baseline, and Release Readiness
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Titan has completed all 12 planned development and evaluation milestones. The system is feature-complete, possessing an authoritative execution runtime, structured event tracing, deterministic replay engine, fidelity divergence detection, failure analysis, the TitanBench failure corpus, recovery-policy experimentation, and research-grade evaluation suites with automated reproducibility validation. A formal release freeze is required to stabilize the public API, enforce technical honesty across all documentation, and ensure independent reproducibility.
+- **Decision**:
+  1. **Architecture & Scope Freeze**:
+     - Declare the repository feature-complete. No new subsystems, runtime dependencies, or experimental extensions will be introduced.
+     - Affirm Titan's core identity as a *"Deterministic Reliability & Failure Replay Engine"* whose purpose is to *"turn distributed failure from an irreproducible incident into a reproducible experiment."*
+  2. **Dependency Minimization**:
+     - Maintain zero external runtime dependencies. The entire system (including vector SVG chart generation and statistical aggregation) runs natively on the standard CPython library.
+  3. **Verification Baseline**:
+     - Enforce a 100% green test baseline across all 207 unit and integration tests (`python -m unittest discover -s tests`).
+     - Mandate end-to-end automated reproducibility verification (`python src/titan/cli.py research verify`).
+  4. **Documentation Audit & Claim Calibration**:
+     - Audit all documentation, README, and reports to eliminate unsupported universal claims and align language strictly with empirical evidence.
+     - Document explicit boundary conditions, threats to validity, and honest guarantees.
+- **Consequences**:
+  - *Positive*: Yields a clean, self-contained, auditable, and reproducible research platform ready for public inspection; provides an unmistakable interview and demonstration story.
+  - *Negative*: Future architectural extensions (networked multi-host RPC, online adaptive policies) remain deferred to prospective future initiatives.
+
+
+
 
 
 

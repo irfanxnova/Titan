@@ -1,0 +1,55 @@
+{
+  "trace_name": "tb_a_baseline",
+  "trace_source": "TB-A-001",
+  "trace_event_count": 46,
+  "trace_size_bytes": 7260,
+  "repetitions": 3,
+  "replay_duration_stats": {
+    "count": 3,
+    "mean": 0.0001,
+    "median": 0.0001,
+    "min": 0.0,
+    "max": 0.0001
+  },
+  "replay_throughput_stats": {
+    "count": 3,
+    "mean": 898833.9017,
+    "median": 888030.8618,
+    "min": 882917.5251,
+    "max": 925553.3182
+  },
+  "replay_valid": true,
+  "validation_errors": [],
+  "trials": [
+    {
+      "trace_name": "tb_a_baseline",
+      "trial_index": 1,
+      "trace_event_count": 46,
+      "trace_size_bytes": 7260,
+      "replay_duration_sec": 5.2e-05,
+      "replay_events_per_sec": 882917.53,
+      "replay_valid": true,
+      "validation_error_count": 0
+    },
+    {
+      "trace_name": "tb_a_baseline",
+      "trial_index": 2,
+      "trace_event_count": 46,
+      "trace_size_bytes": 7260,
+      "replay_duration_sec": 5.2e-05,
+      "replay_events_per_sec": 888030.86,
+      "replay_valid": true,
+      "validation_error_count": 0
+    },
+    {
+      "trace_name": "tb_a_baseline",
+      "trial_index": 3,
+      "trace_event_count": 46,
+      "trace_size_bytes": 7260,
+      "replay_duration_sec": 5e-05,
+      "replay_events_per_sec": 925553.32,
+      "replay_valid": true,
+      "validation_error_count": 0
+    }
+  ]
+}

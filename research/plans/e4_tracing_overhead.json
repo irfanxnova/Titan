@@ -1,0 +1,46 @@
+{
+  "evaluation_id": "E4_TRACING_OVERHEAD",
+  "research_question": "RQ4",
+  "title": "Runtime and Disk Overhead of Deterministic Structured Tracing",
+  "hypothesis": "Structured event tracing introduces bounded wall-clock overhead (<20% on multi-job batches) while generating compact chronological JSON logs with strict linear scaling per lifecycle event.",
+  "dataset_source": "Standard Scaled Workload Matrix",
+  "scenario_set": [
+    "overhead-small",
+    "overhead-medium",
+    "overhead-large"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B0",
+    "BASELINE-B2"
+  ],
+  "independent_variables": {
+    "tracing_mode": [
+      "no_trace (BASELINE-B2)",
+      "with_trace (Mode B)"
+    ],
+    "workload_scale": [
+      "small (10 jobs, 2 workers)",
+      "medium (50 jobs, 2 workers)",
+      "large (100 jobs, 4 workers)"
+    ]
+  },
+  "controlled_variables": {
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "failure_injection": "none"
+  },
+  "dependent_metrics": [
+    "no_trace_duration_sec",
+    "with_trace_duration_sec",
+    "absolute_overhead_sec",
+    "relative_overhead_pct",
+    "trace_event_count",
+    "trace_size_bytes",
+    "bytes_per_event"
+  ],
+  "trial_count": 5,
+  "seed_policy": "fixed: seed=42, 5 repeated trials with warm-up run",
+  "output_artifact_dir": "research/raw/e4_tracing_overhead",
+  "notes": "Measures instrumentation runtime penalty and byte footprint."
+}

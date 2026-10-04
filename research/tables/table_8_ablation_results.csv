@@ -1,0 +1,6 @@
+Ablation ID,Mechanism Name,Scenario,Baseline Config,Ablated Config,Primary Metric,Baseline,Ablated,Delta,Change (%),Impact Assessment
+A1,Worker Process Replacement,TB-B-001,Policy R0 (replace_failed_workers=True),Policy R1 (replace_failed_workers=False),goodput_jobs_per_sec,88.7174,119.5616,+30.8443,+34.77%,IMPROVED
+A2,Retry Budget,TB-E-001,Policy R0 (max_retries=3),Policy R2 (max_retries=1),recovery_rate,1.0000,0.0000,-1.0000,-100.00%,WORSENED
+A3,Deterministic Event Tracing,overhead-medium,Tracing Active (enable_tracing=True),Tracing Disabled (enable_tracing=False),wall_clock_duration_sec,0.2086,0.2064,-0.0022,-1.03%,TRADE_OFF
+A4,Replay Invariant Verification,TB-B-001-trace,Strict Replay Validation (Graph + Invariants),Shallow Replay (Event Iteration Only),replay_duration_sec,0.0001,0.0000,-0.0001,-97.70%,TRADE_OFF
+A5,Resilient Recovery Policy vs Fail-Fast,TB-B-001,Policy R0 (Full Recovery),Policy R3 (Minimal Recovery / Fail-Fast),recovery_rate,1.0000,0.0000,-1.0000,-100.00%,WORSENED

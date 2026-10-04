@@ -1,0 +1,63 @@
+{
+  "config": {
+    "name": "stress-retry-pressure",
+    "category": "retry_pressure",
+    "workers": 2,
+    "jobs": 10,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 1,
+    "replace_failed_workers": true,
+    "timeout": 30.0,
+    "has_fault": true
+  },
+  "repetitions": 1,
+  "successful_trials": 0,
+  "recovery_rate": 0.0,
+  "execution_duration_stats": {
+    "count": 1,
+    "mean": 0.2902,
+    "median": 0.2902,
+    "min": 0.2902,
+    "max": 0.2902
+  },
+  "replay_duration_stats": {
+    "count": 1,
+    "mean": 0.0001,
+    "median": 0.0001,
+    "min": 0.0001,
+    "max": 0.0001
+  },
+  "goodput_stats": {
+    "count": 1,
+    "mean": 31.0169,
+    "median": 31.0169,
+    "min": 31.0169,
+    "max": 31.0169
+  },
+  "trials": [
+    {
+      "config_name": "stress-retry-pressure",
+      "category": "retry_pressure",
+      "trial_index": 1,
+      "workers": 2,
+      "jobs": 10,
+      "work_units": 500,
+      "execution_status": "COMPLETED",
+      "recovery_outcome": "UNRECOVERED",
+      "completed_jobs": 9,
+      "failed_jobs": 1,
+      "total_attempts": 10,
+      "retries": 0,
+      "worker_failures": 1,
+      "worker_replacements": 0,
+      "trace_event_count": 50,
+      "trace_size_bytes": 7932,
+      "replay_valid": true,
+      "replay_duration_sec": 9.9e-05,
+      "wall_clock_duration_sec": 0.290164,
+      "goodput_jobs_per_sec": 31.0169
+    }
+  ]
+}

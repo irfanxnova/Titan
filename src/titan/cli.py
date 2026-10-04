@@ -406,6 +406,46 @@ def build_parser() -> argparse.ArgumentParser:
     eval_all.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for results.")
     eval_all.add_argument("--json", action="store_true", help="Output machine-readable JSON.")
 
+    # 'research' subcommand (Prompt 11: Research-Grade Evaluation, Baselines, Ablations & Reports)
+    research_parser = subparsers.add_parser(
+        "research",
+        help="Research-grade evaluation suites, baselines, ablations, and reproducible reports.",
+    )
+    research_subparsers = research_parser.add_subparsers(
+        dest="research_command",
+        help="Available research subcommands",
+    )
+
+    # research run
+    res_run = research_subparsers.add_parser("run", help="Execute all canonical research evaluation suites and ablations.")
+    res_run.add_argument("--trials", "-t", type=int, default=3, help="Repetitions for timing/evaluation trials (default: 3).")
+    res_run.add_argument("--output-dir", "-o", type=str, default="research", help="Output directory for research artifacts (default: 'research').")
+    res_run.add_argument("--json", action="store_true", help="Output machine-readable JSON summary.")
+
+    # research verify
+    res_ver = research_subparsers.add_parser("verify", help="Validate reproducibility of generated research artifacts.")
+    res_ver.add_argument("--dir", "-d", type=str, default="research", help="Research artifacts directory to verify (default: 'research').")
+    res_ver.add_argument("--json", action="store_true", help="Output machine-readable JSON verification report.")
+
+    # research list-plans
+    res_plans = research_subparsers.add_parser("list-plans", help="List all canonical evaluation plans (E1-E7).")
+    res_plans.add_argument("--json", action="store_true", help="Output plans as JSON.")
+
+    # research report
+    res_rep = research_subparsers.add_parser("report", help="Display or regenerate comprehensive research markdown report.")
+    res_rep.add_argument("--output-dir", "-o", type=str, default="research", help="Research artifacts base directory.")
+    res_rep.add_argument("--json", action="store_true", help="Output report metadata as JSON.")
+
+    # research tables
+    res_tab = research_subparsers.add_parser("tables", help="Generate or regenerate Table 1 through Table 8 in MD and CSV.")
+    res_tab.add_argument("--output-dir", "-o", type=str, default="research", help="Base directory.")
+    res_tab.add_argument("--json", action="store_true", help="Output tables map as JSON.")
+
+    # research figures
+    res_fig = research_subparsers.add_parser("figures", help="Generate or regenerate Figure 1 through Figure 5 in SVG.")
+    res_fig.add_argument("--output-dir", "-o", type=str, default="research", help="Base directory.")
+    res_fig.add_argument("--json", action="store_true", help="Output figures map as JSON.")
+
     return parser
 
 
@@ -413,16 +453,18 @@ def handle_status(json_output: bool = False) -> int:
     """Print the current system status and active configuration."""
     from titan.bench import CorpusRegistry
     from titan.experiment import PolicyRegistry
+    from titan.research import ResearchPlanRegistry
 
     config = TitanConfig.from_env()
     bench_scenarios = [s.scenario_id for s in CorpusRegistry.list_all()]
     policies = [p.policy_id for p in PolicyRegistry.list_all()]
+    plans = [p.evaluation_id for p in ResearchPlanRegistry.list_all()]
 
     if json_output:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 10: Replay/Tracing Overhead & System Stress Evaluation",
+            "milestone": "Milestone 11: Research-Grade Evaluation, Baselines, Ablations & Reproducible Results",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
@@ -430,18 +472,20 @@ def handle_status(json_output: bool = False) -> int:
             "benchmark_corpus": bench_scenarios,
             "recovery_policies": policies,
             "evaluation_framework": "active",
+            "research_plans": plans,
         }
         print(json.dumps(data, indent=2))
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   10 (Overhead & Stress Evaluation; Milestone:   9; Milestone:   8 (TitanBench Failure Corpus & Runner))")
+        print("  Milestone:   11 (Research-Grade Evaluation, Baselines, Ablations & Reproducibility; Milestone:   10; Milestone:   9; Milestone:   8 (TitanBench Failure Corpus & Runner))")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (TitanBench Active, Recovery Policies Active, Evaluation Active)")
-        print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
-        print(f"  TitanBench:  {len(bench_scenarios)} canonical scenarios ({', '.join(bench_scenarios)})")
-        print(f"  Policies:    {', '.join(policies)}")
+        print("  State:       Operational (TitanBench Active, Recovery Policies Active, Evaluation Active, Research Evaluation Layer Active)")
+        print(f"  Scenarios:      {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
+        print(f"  TitanBench:     {len(bench_scenarios)} canonical scenarios ({', '.join(bench_scenarios)})")
+        print(f"  Policies:       {', '.join(policies)}")
+        print(f"  Research Plans: {len(plans)} canonical evaluation plans ({', '.join(plans)})")
 
     return 0
 
@@ -1258,6 +1302,206 @@ def handle_evaluate_all(
     return 0
 
 
+# -----------------------------------------------------------------------------
+# Research-Grade Evaluation Handlers (Prompt 11)
+# -----------------------------------------------------------------------------
+
+
+def handle_research_run(
+    trials: int = 3,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute complete research evaluation suite across all research questions."""
+    from titan.research.orchestrator import ResearchOrchestrator
+
+    base_dir = output_dir or "research"
+    orchestrator = ResearchOrchestrator(base_dir=base_dir)
+
+    print("==================================================================")
+    print("Titan Research Evaluation: Running Full Empirical Suite")
+    print(f"Base Output Directory: {base_dir}")
+    print(f"Repetitions per Suite: {trials}")
+    print("==================================================================")
+
+    res = orchestrator.run_all(
+        e1_trials=trials,
+        e2_trials=trials,
+        e3_trials=2,
+        e4_trials=trials,
+        e5_trials=trials,
+    )
+
+    if json_output:
+        print(json.dumps(res, indent=2))
+        return 0
+
+    repro = res.get("reproducibility", {})
+    passed = repro.get("verification_passed", False)
+
+    print()
+    print("==================================================================")
+    print("Titan Research Evaluation Run Complete")
+    print("==================================================================")
+    print(f"  Artifact Directory:  {base_dir}")
+    print(f"  Research Report:     {res.get('report_path')}")
+    print(f"  Generated Tables:    {len(res.get('tables', {}))} files (Markdown & CSV)")
+    print(f"  Generated Figures:   {len(res.get('figures', {}))} SVG charts")
+    print(f"  Reproducibility:     {'PASSED (VERIFIED)' if passed else 'FAILED'}")
+    for detail in repro.get("details", []):
+        print(f"    - {detail}")
+    print("==================================================================")
+    return 0 if passed else 1
+
+
+def handle_research_verify(
+    artifacts_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Verify reproducibility and data consistency of research artifacts."""
+    from titan.research.reproducibility import verify_reproducibility
+
+    base_dir = artifacts_dir or "research"
+    repro = verify_reproducibility(base_dir=base_dir)
+
+    if json_output:
+        print(repro.to_json(indent=2))
+        return 0 if repro.verification_passed else 1
+
+    print("==================================================================")
+    print("Titan Research Reproducibility Verification")
+    print(f"Target Directory: {base_dir}")
+    print("==================================================================")
+    print(f"  Evaluation Plans:   {len(repro.plans_verified)} verified")
+    print(f"  Schema Consistency: {'VALID' if repro.schemas_valid else 'INVALID'}")
+    print(f"  Categorical States: {'CONSISTENT' if repro.categorical_outcomes_consistent else 'DIVERGED'}")
+    print(f"  Generated Tables:   {len(repro.tables_generated)} found")
+    print(f"  Generated Figures:  {len(repro.figures_generated)} found")
+    print(f"  Comprehensive Report: {'FOUND' if repro.report_generated else 'MISSING'}")
+    print(f"  Overall Status:     {'PASSED (REPRODUCIBLE)' if repro.verification_passed else 'FAILED'}")
+    print("------------------------------------------------------------------")
+    for d in repro.details:
+        print(f"  * {d}")
+    print("==================================================================")
+    return 0 if repro.verification_passed else 1
+
+
+def handle_research_list_plans(json_output: bool = False) -> int:
+    """List all canonical evaluation plans (E1-E7)."""
+    from titan.research.plan import ResearchPlanRegistry
+
+    plans = ResearchPlanRegistry.list_all()
+
+    if json_output:
+        data = [p.to_dict() for p in plans]
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print("==================================================================")
+    print("Titan Canonical Evaluation Plans (Research-Grade)")
+    print("==================================================================")
+    header = f"{'Plan ID':<22} | {'RQ':<7} | {'Scenarios':<32} | {'Title'}"
+    print(header)
+    print("-" * 95)
+    for p in plans:
+        scens = ", ".join(p.scenario_set[:3])
+        if len(p.scenario_set) > 3:
+            scens += f" (+{len(p.scenario_set)-3})"
+        print(f"{p.evaluation_id:<22} | {p.research_question:<7} | {scens:<32} | {p.title}")
+    print("==================================================================")
+    return 0
+
+
+def handle_research_report(
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Display or print path to the generated research report."""
+    base_dir = Path(output_dir or "research")
+    report_file = base_dir / "reports" / "titan_research_report.md"
+
+    if not report_file.exists():
+        print(f"Error: Report file not found at {report_file}. Run 'titan research run' first.", file=sys.stderr)
+        return 1
+
+    content = report_file.read_text(encoding="utf-8")
+    if json_output:
+        data = {
+            "report_path": str(report_file),
+            "size_bytes": report_file.stat().st_size,
+            "lines": len(content.splitlines()),
+        }
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print(content)
+    return 0
+
+
+def handle_research_tables(
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """List and check status of all 8 generated research tables."""
+    base_dir = Path(output_dir or "research") / "tables"
+    if not base_dir.exists():
+        print(f"Error: Tables directory not found at {base_dir}. Run 'titan research run' first.", file=sys.stderr)
+        return 1
+
+    md_files = sorted(list(base_dir.glob("*.md")))
+    csv_files = sorted(list(base_dir.glob("*.csv")))
+
+    if json_output:
+        data = {
+            "tables_directory": str(base_dir),
+            "markdown_tables": [str(p) for p in md_files],
+            "csv_tables": [str(p) for p in csv_files],
+        }
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print("==================================================================")
+    print("Titan Research Summary Tables")
+    print(f"Directory: {base_dir}")
+    print("==================================================================")
+    for p in md_files:
+        print(f"  - [Markdown] {p.name:<32} ({p.stat().st_size} bytes)")
+    for p in csv_files:
+        print(f"  - [CSV]      {p.name:<32} ({p.stat().st_size} bytes)")
+    print("==================================================================")
+    return 0
+
+
+def handle_research_figures(
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """List and check status of all 5 generated research figures."""
+    base_dir = Path(output_dir or "research") / "figures"
+    if not base_dir.exists():
+        print(f"Error: Figures directory not found at {base_dir}. Run 'titan research run' first.", file=sys.stderr)
+        return 1
+
+    svg_files = sorted(list(base_dir.glob("*.svg")))
+
+    if json_output:
+        data = {
+            "figures_directory": str(base_dir),
+            "figures": [str(p) for p in svg_files],
+        }
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print("==================================================================")
+    print("Titan Research Publication Figures")
+    print(f"Directory: {base_dir}")
+    print("==================================================================")
+    for p in svg_files:
+        print(f"  - [SVG] {p.name:<40} ({p.stat().st_size} bytes)")
+    print("==================================================================")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -1378,6 +1622,39 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             print("Error: Specify an evaluate subcommand (overhead, replay, stress, all). See 'titan evaluate --help'.", file=sys.stderr)
+            return 1
+
+    if args.command == "research":
+        if args.research_command == "run":
+            return handle_research_run(
+                trials=args.trials,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.research_command == "verify":
+            return handle_research_verify(
+                artifacts_dir=args.dir,
+                json_output=args.json,
+            )
+        elif args.research_command == "list-plans":
+            return handle_research_list_plans(json_output=args.json)
+        elif args.research_command == "report":
+            return handle_research_report(
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.research_command == "tables":
+            return handle_research_tables(
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.research_command == "figures":
+            return handle_research_figures(
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        else:
+            print("Error: Specify a research subcommand (run, verify, list-plans, report, tables, figures). See 'titan research --help'.", file=sys.stderr)
             return 1
 
     parser.print_help()

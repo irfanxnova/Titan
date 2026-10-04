@@ -1,0 +1,11 @@
+{
+  "titan_version": "0.1.0",
+  "python_version": "3.14.8",
+  "python_implementation": "CPython",
+  "os_system": "Windows",
+  "os_release": "11",
+  "os_architecture": "AMD64",
+  "cpu_count": 16,
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "timestamp_utc": "2026-10-04T16:28:26.863906+00:00"
+}

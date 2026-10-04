@@ -1,0 +1,65 @@
+{
+  "experiment_id": "EXP_TB-C-001_R1",
+  "scenario_id": "TB-C-001",
+  "scenario_class": "CLASS_C_IN_FLIGHT_FAILURE",
+  "policy_id": "R1",
+  "policy_config": {
+    "policy_id": "R1",
+    "name": "no-worker-replacement",
+    "description": "Failed workers are not replaced (replace_failed_workers=False); remaining workers process retried jobs under degraded capacity.",
+    "replace_failed_workers": false,
+    "max_retries": 3,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "base_scenario": {
+    "scenario_id": "TB-C-001",
+    "name": "in-flight-worker-failure",
+    "scenario_class": "CLASS_C_IN_FLIGHT_FAILURE",
+    "description": "Worker terminates mid-execution while an attempt is in-flight; verifies lost attempt tracking and recovery.",
+    "scenario": {
+      "name": "tb-in-flight-fail",
+      "num_workers": 2,
+      "num_jobs": 8,
+      "work_units": 1000,
+      "pattern": "uniform",
+      "seed": 42,
+      "max_retries": 3,
+      "replace_failed_workers": true,
+      "faults": [
+        {
+          "target_worker": "worker-0",
+          "kill_after_jobs": 1,
+          "target_job_id": null
+        }
+      ],
+      "duplicate_jobs": [],
+      "timeout": null
+    },
+    "expected_behavior": {
+      "expected_replay_valid": true,
+      "expected_run_state": "COMPLETED",
+      "expected_overall_status": "RECOVERED",
+      "expected_root_failures": 1,
+      "expected_root_class": "WORKER_FAILURE",
+      "expected_recovery_outcome": "RECOVERED",
+      "expected_worker_failures": 1,
+      "expected_worker_replacements": 1,
+      "min_retries": 1,
+      "max_retries": null,
+      "expected_completed_jobs": 8,
+      "expected_failed_jobs": 0,
+      "expected_duplicate_ignored": 0
+    }
+  },
+  "effective_scenario": {
+    "name": "tb-in-flight-fail_r1",
+    "workers": 2,
+    "jobs": 8,
+    "work_units": 1000,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 3,
+    "replace_failed_workers": false
+  }
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="100%" height="100%">
+<rect width="760" height="420" fill="#ffffff" rx="6"/>
+<text x="380.0" y="28" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#1e293b">FIGURE 5: Mechanism Ablation Impact on Primary Metrics (RQ6)</text>
+<text x="380.0" y="46" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Relative Change (%) in Primary Metric Observed When Ablating Mechanism</text>
+<line x1="450.0" y1="60" x2="450.0" y2="370" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="450.0" y="79.0" width="76.48713981153496" height="24.0" fill="#0d9488" rx="3"/>
+<text x="218" y="95.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">A1: Worker Process Replacement</text>
+<text x="534.4871398115349" y="95.0" text-anchor="start" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#0d9488">+34.8% (IMPROVED)</text>
+<rect x="230.0" y="141.0" width="220.0" height="24.0" fill="#e11d48" rx="3"/>
+<text x="218" y="157.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">A2: Retry Budget</text>
+<text x="222.0" y="157.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#e11d48">-100.0% (WORSENED)</text>
+<rect x="447.7290554410777" y="203.0" width="2.270944558922265" height="24.0" fill="#e11d48" rx="3"/>
+<text x="218" y="219.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">A3: Deterministic Event Tracing</text>
+<text x="439.7290554410777" y="219.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#e11d48">-1.0% (TRADE_OFF)</text>
+<rect x="235.05369958460838" y="265.0" width="214.94630041539162" height="24.0" fill="#e11d48" rx="3"/>
+<text x="218" y="281.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">A4: Replay Invariant Verification</text>
+<text x="227.05369958460838" y="281.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#e11d48">-97.7% (TRADE_OFF)</text>
+<rect x="230.0" y="327.0" width="220.0" height="24.0" fill="#e11d48" rx="3"/>
+<text x="218" y="343.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">A5: Resilient Recovery Policy vs Fail-Fast</text>
+<text x="222.0" y="343.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#e11d48">-100.0% (WORSENED)</text>
+<text x="450.0" y="390" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1e293b">0% (Baseline Reference)</text>
+<text x="230" y="390" text-anchor="start" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">-100% (Degraded)</text>
+<text x="670" y="390" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">+100% (Overhead/Speedup)</text>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 420" width="100%" height="100%">
+<rect width="740" height="420" fill="#ffffff" rx="6"/>
+<text x="370.0" y="28" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#1e293b">FIGURE 2: Tracing Instrumentation Overhead vs. Workload Scale (RQ4)</text>
+<text x="370.0" y="46" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Execution Wall-Clock Time (s) with Tracing Disabled vs. Active</text>
+<line x1="80" y1="340.0" x2="690" y2="340.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="344.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.00 s</text>
+<line x1="80" y1="284.0" x2="690" y2="284.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="288.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.36 s</text>
+<line x1="80" y1="228.0" x2="690" y2="228.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="232.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">0.72 s</text>
+<line x1="80" y1="171.99999999999997" x2="690" y2="171.99999999999997" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="175.99999999999997" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">1.08 s</text>
+<line x1="80" y1="116.0" x2="690" y2="116.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="120.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">1.44 s</text>
+<line x1="80" y1="60.0" x2="690" y2="60.0" stroke="#f1f5f9" stroke-width="1.5"/>
+<text x="68" y="64.0" text-anchor="end" font-family="system-ui, sans-serif" font-size="11" fill="#64748b">1.80 s</text>
+<line x1="80" y1="60" x2="80" y2="340" stroke="#94a3b8" stroke-width="1.5"/>
+<line x1="80" y1="340" x2="690" y2="340" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="141.66666666666669" y="309.16092962955764" width="36.0" height="30.839070370442375" fill="#64748b" rx="3"/>
+<text x="159.66666666666669" y="303.16092962955764" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#64748b">0.20s</text>
+<rect x="185.66666666666669" y="307.92049851857075" width="36.0" height="32.07950148142926" fill="#2563eb" rx="3"/>
+<text x="203.66666666666669" y="301.92049851857075" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2563eb">0.21s</text>
+<text x="181.66666666666669" y="287.92049851857075" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e11d48">+4.1%</text>
+<text x="181.66666666666669" y="358" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">overhead-small</text>
+<text x="181.66666666666669" y="372" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">10 jobs (2w)</text>
+<rect x="345.00000000000006" y="307.255866666609" width="36.0" height="32.744133333391" fill="#64748b" rx="3"/>
+<text x="363.00000000000006" y="301.255866666609" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#64748b">0.21s</text>
+<rect x="389.00000000000006" y="308.32271333373177" width="36.0" height="31.677286666268227" fill="#2563eb" rx="3"/>
+<text x="407.00000000000006" y="302.32271333373177" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2563eb">0.20s</text>
+<text x="385.00000000000006" y="287.255866666609" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e11d48">-3.2%</text>
+<text x="385.00000000000006" y="358" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">overhead-medium</text>
+<text x="385.00000000000006" y="372" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">50 jobs (2w)</text>
+<rect x="548.3333333333334" y="303.03367925936107" width="36.0" height="36.96632074063894" fill="#64748b" rx="3"/>
+<text x="566.3333333333334" y="297.03367925936107" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#64748b">0.24s</text>
+<rect x="592.3333333333334" y="301.49201481473733" width="36.0" height="38.50798518526265" fill="#2563eb" rx="3"/>
+<text x="610.3333333333334" y="295.49201481473733" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2563eb">0.25s</text>
+<text x="588.3333333333334" y="281.49201481473733" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#e11d48">+4.2%</text>
+<text x="588.3333333333334" y="358" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e293b">overhead-large</text>
+<text x="588.3333333333334" y="372" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">100 jobs (4w)</text>
+<rect x="250.0" y="392" width="12" height="12" fill="#64748b" rx="2"/>
+<text x="268.0" y="402" font-family="system-ui, sans-serif" font-size="11" fill="#1e293b">No-Trace Baseline (Mode A)</text>
+<rect x="420.0" y="392" width="12" height="12" fill="#2563eb" rx="2"/>
+<text x="438.0" y="402" font-family="system-ui, sans-serif" font-size="11" fill="#1e293b">With-Trace Active (Mode B)</text>
+</svg>

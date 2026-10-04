@@ -392,53 +392,100 @@ Implemented in `src/titan/experiment/evaluation.py`:
   - Strict conceptual separation between *logical determinism* (reproducible event sequences, state reconstruction, recovery classifications) and *physical timing variability* (Windows process spawning latency, OS scheduling jitter).
   - Raw timing samples across repeated trials ($N \ge 3$) are preserved alongside aggregate summary statistics (`count`, `mean`, `median`, `min`, `max`).
 
-### 1.15 Known Limitations of Milestone 10
-- **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state.
-- **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes (`multiprocessing.Queue`).
-- **OS Process Spawning Jitter**: On Windows, child processes spawned via `multiprocessing.spawn` incur non-deterministic process startup latency (typically 50–200ms per pool). Wall-clock measurements reflect this host scheduling variance.
-- **Summary Statistics Only**: Metrics report sample counts, means, medians, min, and max. Final research-grade inference (confidence intervals, ANOVA, hypothesis testing) is intentionally deferred to Milestone 11.
-- **No Learned Recovery**: Policies are static configurations; dynamic or machine-learning-based recovery selection is out of scope.
+### 1.16 Milestone 11: Research-Grade Evaluation, Baselines, Ablations & Reproducibility Architecture
+
+Milestone 11 completes Titan's empirical evaluation layer, transitioning the codebase into a publication-grade experimental research platform capable of answering RQ1–RQ6 with reproducible evidence.
+
+#### 1. Evaluation Plan Abstraction (`src/titan/research/plan.py`)
+- **Model**: `EvaluationPlan` formalizes research inquiries into immutable, JSON-serializable specifications containing:
+  - `evaluation_id`: Stable identifier (e.g. `E1_REPLAY_FIDELITY`).
+  - `research_question`: Explicit mapping to research questions (`RQ1` to `RQ6`).
+  - `title` & `hypothesis`: Concrete, falsifiable empirical objectives.
+  - `dataset_source` & `scenario_set`: Controlled scenario inputs from TitanBench.
+  - `policies_or_baselines`: Reference baselines and candidate execution policies.
+  - `independent_variables` & `controlled_variables`: Rigorous experimental control definitions.
+  - `dependent_metrics`: Quantitative and categorical metrics to evaluate.
+  - `trial_count` & `seed_policy`: Trial repetition and deterministic seeding rules.
+  - `output_artifact_dir`: Target filesystem destination.
+- **Registry**: `ResearchPlanRegistry` maintains canonical evaluation plans for all suites (`E1` through `E7`).
+
+#### 2. Research Questions & Evaluation Matrix
+| Research Question | Core Inquiry | Evaluation Suite | Independent Variables | Key Metrics |
+|:---|:---|:---:|:---|:---|
+| **RQ1 — Replay Fidelity** | How reliably can Titan reproduce the same logical failure and execution history? | **Suite E1** | Clean, crash, repeated crash, tampered divergence, corrupted traces | Replay validity rate, equivalence rate, divergence detection rate, first-divergence localization |
+| **RQ2 — Failure Diagnosis** | Does deterministic replay and structured analysis improve failure localization and root-cause classification? | **Suite E2** | TitanBench scenarios with known injected ground truth (Classes A, B, C, D, E, G) | Root-class classification accuracy, affected entity localization accuracy, recovery assessment accuracy |
+| **RQ3 — Recovery Policies** | How do different recovery policies affect recovery rate, work efficiency, and goodput? | **Suite E3** | Recovery policies (R0 full recovery, R1 no replacement, R2 limited retry) | Recovery rate, retries, lost work, duplicate work, goodput, execution duration |
+| **RQ4 — Instrumentation Cost** | How much wall-clock and disk overhead does structured event tracing impose? | **Suite E4 & E5** | Tracing disabled (BASELINE-B2) vs enabled; workload scale | Wall-clock duration, absolute overhead, relative overhead %, trace size bytes, bytes/event |
+| **RQ5 — Failure Complexity** | How does system behavior change as workers, jobs, retries, and failure complexity increase? | **Suite E5 & E6** | Worker counts (2–4), jobs (10–100), single vs multi-crash, retry exhaustion | Replay throughput (ev/s), replay duration, completion status, goodput scaling, recovery outcome |
+| **RQ6 — Mitigation Quality** | Which architectural mechanisms improve recovery without unacceptable retry or duplicate-work costs? | **Suite E3 & E7** | Mechanism ablations (A1–A5) and policy trade-offs | Recovery rate delta, lost work delta, retries delta, throughput impact, qualitative assessment |
+
+#### 3. Controlled Baselines (`src/titan/research/baselines.py`)
+- **BASELINE-B0**: Normal execution with zero injected failures (establishes baseline throughput and latency).
+- **BASELINE-B1**: Standard Titan recovery policy (`R0`: automatic worker replacement, max retries = 3).
+- **BASELINE-B2**: No-trace execution (`enable_tracing=False`) for isolating instrumentation overhead.
+- **BASELINE-B3**: Alternative recovery policies (`R1`: degraded capacity, `R2`: limited retry, `R3`: fail-fast).
+
+#### 4. Architecture Mechanism Ablations (`src/titan/research/ablations.py`)
+Isolates and quantifies the empirical contribution of key mechanisms:
+- **Ablation A1 (Worker Process Replacement)**: Compares Policy `R0` vs `R1` on worker crash scenarios (`TB-B-001`, `TB-D-001`) to measure capacity loss and throughput degradation.
+- **Ablation A2 (Retry Budget)**: Compares Policy `R0` (`max_retries=3`) vs `R2` (`max_retries=1`) on retry pressure (`TB-E-001`) to prove that worker replacement without sufficient retries causes unrecovered failures.
+- **Ablation A3 (Deterministic Event Tracing)**: Compares `enable_tracing=True` vs `False` on identical workloads to measure wall-clock overhead and auditability loss.
+- **Ablation A4 (Replay Invariant Verification)**: Compares full graph and state invariant validation against shallow event iteration to measure verification cost (<0.1ms).
+- **A5 (Resilient Policy vs Fail-Fast)**: Compares Policy `R0` vs `R3` (minimal recovery / fail-fast) under worker failure to measure resilience vs fatal termination.
+
+#### 5. Transparent Descriptive Statistics & Normalization (`src/titan/research/stats.py`)
+- Employs strictly defensible descriptive statistics (`DescriptiveStats`): sample count $N$, arithmetic mean, median, min, max, sample standard deviation ($s$), and coefficient of variation ($CV$).
+- Fabricated inferential statistics, confidence intervals, and cosmetic hypothesis testing are avoided.
+- Safe non-zero denominator checks are enforced for all ratios (`compute_normalized_ratio`) and percentage deltas (`compute_relative_change_pct`).
+
+#### 6. Result Package Structure (`research/`)
+```
+research/
+    plans/         # Authoritative evaluation plan JSON specifications (E1-E7)
+    runs/          # Sanitized environment metadata and run execution parameters
+    raw/           # Machine-readable trial records per suite and ablation
+    summaries/     # Aggregate numerical summary JSON files
+    tables/        # Publication-ready Markdown (.md) and machine-readable CSV (.csv) tables
+    figures/       # Publication-style vector SVG charts and companion JSON data points
+    reports/       # Automated comprehensive research report (titan_research_report.md)
+```
+
+#### 7. Automated Table & Figure Generation (`src/titan/research/tables.py`, `figures.py`)
+- **Tables 1–8**: Automatically generated in Markdown and CSV from recorded data:
+  - Table 1: TitanBench Corpus Coverage
+  - Table 2: Replay Fidelity & Divergence Detection (RQ1)
+  - Table 3: Failure Classification Accuracy against Injected Ground Truth (RQ2)
+  - Table 4: Recovery Policy Comparison (RQ3, RQ6)
+  - Table 5: Tracing Instrumentation Overhead (RQ4)
+  - Table 6: Deterministic Replay Cost & Throughput (RQ4, RQ5)
+  - Table 7: System Stress & Scaling Behavior (RQ5)
+  - Table 8: Mechanism Ablation Results (RQ6)
+- **Figures 1–5**: Vector SVG charts generated directly via standard-library string templating (zero third-party plotting dependencies):
+  - Figure 1: Job Recovery Rate by Policy across Failure Scenarios.
+  - Figure 2: Tracing Instrumentation Overhead vs. Workload Scale.
+  - Figure 3: Deterministic Replay Duration vs. Event Scale.
+  - Figure 4: System Goodput Scaling across Concurrency & Workloads.
+  - Figure 5: Mechanism Ablation Impact on Primary Metrics.
+
+#### 8. Reproducibility Routine (`src/titan/research/reproducibility.py`)
+`verify_reproducibility()` reloads plans, verifies artifact presence and JSON schemas, confirms that logical/categorical determinism holds (100% equivalence, 100% diagnostic accuracy against ground truth), and ensures that all tables, figures, and reports are non-empty.
+
+### 1.17 Known Limitations & Boundary Conditions
+- **Local Multiprocessing Boundary**: Evaluated on a single physical host via OS process spawning. Cross-host network latency, asymmetric packet loss, and physical node partitions are outside the current static runtime scope.
+- **Windows Process Spawning Latency**: Child process initialization under Windows `spawn` adds ~50–200ms of startup latency, dominating very short (10-job) micro-benchmarks.
+- **Descriptive Statistical Bounds**: Evaluations use bounded repetitions ($N=3$ to $N=5$) appropriate for local test execution; variance reflects host OS scheduling jitter.
 
 ---
 
-## 2. Planned Architecture
+## 2. Future Research Horizons (Post-Freeze Extensions)
 
-The following components will be introduced in subsequent research milestones:
+The core deterministic reliability, tracing, replay, and evaluation engines are now feature-complete and frozen. Prospective future extensions outside the scope of this repository include:
 
-```
-+--------------------------------------------------------------------------+
-|                       Experiment Orchestrator                            |
-|  - Automates parameter matrices, runs baselines, records trials          |
-+---------------------+------------------------------+---------------------+
-                      |                              |
-                      v                              v
-      +-------------------------------+  +-------------------------------+
-      |       Workload Generator      |  |   Extended Failure Injector   |
-      |   (Synthesizes bursty, Poisson|  |   (Injects network partitions,|
-      |    and heavy-tailed arrivals) |  |    asymmetric stalls, drops)  |
-      +---------------+---------------+  +---------------+---------------+
-                      |                                  |
-                      +------------------+---------------+
-                                         |
-                                         v
-                         +-------------------------------+
-                         |   Adaptive Execution Engine   |
-                         |   (Dynamic concurrency limits,|
-                         |    backpressure throttling)   |
-                         +---------------+---------------+
-```
+1. **Networked Distributed Clocks & Transport**:
+   - Evaluating raw TCP socket framing vs lightweight HTTP/1.1 for multi-machine cluster nodes.
+2. **Workload Arrival Synthesizers**:
+   - Synthesizing non-uniform arrival distributions (bursty arrival spikes, Poisson processes) and variable job service times.
+3. **Adaptive Execution Policies**:
+   - Implementing dynamic runtime policies (e.g., adaptive concurrency limits, dynamic backpressure throttling) to empirically compare against Titan's verified static baselines.
 
-### 2.1 Workload Generator (Milestone 4)
-- Will synthesize non-uniform arrival distributions (bursty arrival spikes, Poisson processes) and variable job service times to stress test scheduling behavior.
 
-### 2.2 Adaptive Execution Policies (Milestone 5)
-- Will implement dynamic policies (e.g., adaptive concurrency control, dynamic backpressure throttling) to empirically compare against this static baseline with recovery.
-
----
-
-## 3. Unresolved Decisions
-
-1. **Networked Inter-Node RPC Protocol**:
-   - Evaluating raw TCP framing vs lightweight HTTP/1.1 vs gRPC for multi-host clusters.
-2. **Persistent Telemetry Formats**:
-   - Evaluating JSON Lines (`.jsonl`) logs vs structured Parquet arrays for large automated multi-run experiment sweeps.

@@ -1,0 +1,40 @@
+{
+  "evaluation_id": "E1_REPLAY_FIDELITY",
+  "research_question": "RQ1",
+  "title": "Deterministic Replay Equivalence and Divergence Localization",
+  "hypothesis": "Under identical execution inputs and recorded traces, deterministic replay reconstructs identical logical states with 100% equivalence, while synthetic divergences are localized to the exact sequence, category, and entity.",
+  "dataset_source": "Titan Canonical Execution Traces (Clean, Single Crash, Multi-Crash)",
+  "scenario_set": [
+    "TB-A-001",
+    "TB-B-001",
+    "TB-D-001"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1"
+  ],
+  "independent_variables": {
+    "trace_condition": [
+      "clean_trace",
+      "worker_crash_trace",
+      "repeated_failure_trace",
+      "tampered_divergence_trace",
+      "malformed_trace"
+    ]
+  },
+  "controlled_variables": {
+    "replay_engine": "titan.replay.ReplayEngine",
+    "fidelity_engine": "titan.replay.ReplayFidelityEngine",
+    "divergence_detector": "titan.replay.TraceDivergenceDetector"
+  },
+  "dependent_metrics": [
+    "replay_validity_rate",
+    "trace_equivalence_rate",
+    "divergence_detection_rate",
+    "first_divergence_consistency",
+    "divergence_category_counts"
+  ],
+  "trial_count": 5,
+  "seed_policy": "fixed: seed=42 across all runs",
+  "output_artifact_dir": "research/raw/e1_replay_fidelity",
+  "notes": "Tests exact state reconstruction, corruption detection, and divergence localization."
+}

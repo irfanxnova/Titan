@@ -1,0 +1,364 @@
+[
+  {
+    "seq": 1,
+    "event_type": "RUN_STARTED",
+    "timestamp": 38678.883908,
+    "data": {
+      "total_jobs": 6,
+      "num_workers": 2,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 2,
+    "event_type": "WORKER_STARTED",
+    "timestamp": 38678.883926,
+    "worker_id": "worker-0",
+    "data": {
+      "is_replacement": false,
+      "replaced_worker_id": null
+    }
+  },
+  {
+    "seq": 3,
+    "event_type": "WORKER_STARTED",
+    "timestamp": 38678.883931,
+    "worker_id": "worker-1",
+    "data": {
+      "is_replacement": false,
+      "replaced_worker_id": null
+    }
+  },
+  {
+    "seq": 4,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.883935,
+    "job_id": "job-000000",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 5,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.884338,
+    "job_id": "job-000001",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 6,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.884352,
+    "job_id": "job-000002",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 7,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.884358,
+    "job_id": "job-000003",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 8,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.884362,
+    "job_id": "job-000004",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 9,
+    "event_type": "JOB_CREATED",
+    "timestamp": 38678.884394,
+    "job_id": "job-000005",
+    "data": {
+      "work_units": 500,
+      "max_retries": 3
+    }
+  },
+  {
+    "seq": 10,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.884982,
+    "job_id": "job-000001",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 11,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.886019,
+    "job_id": "job-000001",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 12,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.886066,
+    "job_id": "job-000001",
+    "attempt_id": 1,
+    "worker_id": "worker-1",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 4.7e-05,
+      "total_latency": 0.129326
+    }
+  },
+  {
+    "seq": 13,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.886297,
+    "job_id": "job-000002",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 14,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.886313,
+    "job_id": "job-000002",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 15,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.88635,
+    "job_id": "job-000002",
+    "attempt_id": 1,
+    "worker_id": "worker-1",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 3.7e-05,
+      "total_latency": 0.129609
+    }
+  },
+  {
+    "seq": 16,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.886518,
+    "job_id": "job-000003",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 17,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.886531,
+    "job_id": "job-000003",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 18,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.886564,
+    "job_id": "job-000003",
+    "attempt_id": 1,
+    "worker_id": "worker-1",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 3.3e-05,
+      "total_latency": 0.129822
+    }
+  },
+  {
+    "seq": 19,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.886591,
+    "job_id": "job-000004",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 20,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.886594,
+    "job_id": "job-000004",
+    "attempt_id": 1,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 21,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.884814,
+    "job_id": "job-000000",
+    "attempt_id": 1,
+    "worker_id": "worker-0"
+  },
+  {
+    "seq": 22,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.886625,
+    "job_id": "job-000004",
+    "attempt_id": 1,
+    "worker_id": "worker-1",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 3.1e-05,
+      "total_latency": 0.129882
+    }
+  },
+  {
+    "seq": 23,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.886525,
+    "job_id": "job-000000",
+    "attempt_id": 1,
+    "worker_id": "worker-0"
+  },
+  {
+    "seq": 24,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.886567,
+    "job_id": "job-000000",
+    "attempt_id": 1,
+    "worker_id": "worker-0",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 4.3e-05,
+      "total_latency": 0.12983
+    }
+  },
+  {
+    "seq": 25,
+    "event_type": "JOB_ASSIGNED",
+    "timestamp": 38678.886819,
+    "job_id": "job-000005",
+    "attempt_id": 1,
+    "worker_id": "worker-0"
+  },
+  {
+    "seq": 26,
+    "event_type": "WORKER_FAILED",
+    "timestamp": 38678.912971,
+    "worker_id": "worker-0",
+    "data": {
+      "exit_code": 42
+    }
+  },
+  {
+    "seq": 27,
+    "event_type": "JOB_LOST",
+    "timestamp": 38678.913071,
+    "job_id": "job-000005",
+    "attempt_id": 1,
+    "worker_id": "worker-0",
+    "data": {
+      "reason": "Worker worker-0 terminated unexpectedly (exit code 42)"
+    }
+  },
+  {
+    "seq": 28,
+    "event_type": "RETRY_SCHEDULED",
+    "timestamp": 38678.913114,
+    "job_id": "job-000005",
+    "attempt_id": 2,
+    "data": {
+      "previous_attempt": 1,
+      "reason": "worker_failure"
+    }
+  },
+  {
+    "seq": 29,
+    "event_type": "WORKER_REPLACED",
+    "timestamp": 38678.928728,
+    "worker_id": "worker-0-r1",
+    "data": {
+      "replaced_worker_id": "worker-0"
+    }
+  },
+  {
+    "seq": 30,
+    "event_type": "WORKER_STARTED",
+    "timestamp": 38678.928736,
+    "worker_id": "worker-0-r1",
+    "data": {
+      "is_replacement": true,
+      "replaced_worker_id": "worker-0"
+    }
+  },
+  {
+    "seq": 31,
+    "event_type": "JOB_REASSIGNED",
+    "timestamp": 38678.913469,
+    "job_id": "job-000005",
+    "attempt_id": 2,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 32,
+    "event_type": "JOB_STARTED",
+    "timestamp": 38678.913489,
+    "job_id": "job-000005",
+    "attempt_id": 2,
+    "worker_id": "worker-1"
+  },
+  {
+    "seq": 33,
+    "event_type": "JOB_COMPLETED",
+    "timestamp": 38678.913527,
+    "job_id": "job-000005",
+    "attempt_id": 2,
+    "worker_id": "worker-1",
+    "data": {
+      "result": 3882944,
+      "processing_duration": 3.8e-05,
+      "total_latency": 0.156783
+    }
+  },
+  {
+    "seq": 34,
+    "event_type": "RUN_COMPLETED",
+    "timestamp": 38678.982541,
+    "data": {
+      "wall_clock_duration": 0.098623,
+      "total_submitted": 6,
+      "completed": 6,
+      "failed": 0,
+      "retries": 1,
+      "worker_failures": 1
+    }
+  },
+  {
+    "seq": 35,
+    "event_type": "WORKER_EXITED",
+    "timestamp": 38678.98261,
+    "worker_id": "worker-0",
+    "data": {
+      "clean_shutdown": true
+    }
+  },
+  {
+    "seq": 36,
+    "event_type": "WORKER_EXITED",
+    "timestamp": 38678.997924,
+    "worker_id": "worker-1",
+    "data": {
+      "clean_shutdown": true
+    }
+  },
+  {
+    "seq": 37,
+    "event_type": "WORKER_EXITED",
+    "timestamp": 38679.052827,
+    "worker_id": "worker-0-r1",
+    "data": {
+      "clean_shutdown": true
+    }
+  }
+]

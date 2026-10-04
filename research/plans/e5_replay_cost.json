@@ -1,0 +1,37 @@
+{
+  "evaluation_id": "E5_REPLAY_COST",
+  "research_question": "RQ4, RQ5",
+  "title": "Deterministic Replay Execution Duration and Throughput Scaling",
+  "hypothesis": "Offline trace replay processes lifecycle events in sub-millisecond durations with throughput exceeding 200,000 events/sec, scaling linearly with trace length.",
+  "dataset_source": "Execution Traces from Clean, Crash, and Repeated Crash Scenarios",
+  "scenario_set": [
+    "tb_a_baseline",
+    "tb_b_worker_crash",
+    "tb_d_repeated_failure"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1"
+  ],
+  "independent_variables": {
+    "trace_size_and_complexity": [
+      "clean_trace (46 events)",
+      "worker_crash_trace (53 events)",
+      "repeated_failure_trace (82 events)"
+    ]
+  },
+  "controlled_variables": {
+    "replay_engine": "titan.replay.ReplayEngine",
+    "validation_mode": "strict"
+  },
+  "dependent_metrics": [
+    "trace_event_count",
+    "trace_size_bytes",
+    "replay_duration_sec",
+    "replay_events_per_sec",
+    "replay_validity"
+  ],
+  "trial_count": 5,
+  "seed_policy": "deterministic offline replay (no external randomness)",
+  "output_artifact_dir": "research/raw/e5_replay_cost",
+  "notes": "Quantifies offline verification speed and computational scalability."
+}

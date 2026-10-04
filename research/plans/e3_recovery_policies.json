@@ -1,0 +1,48 @@
+{
+  "evaluation_id": "E3_RECOVERY_POLICIES",
+  "research_question": "RQ3, RQ6",
+  "title": "Comparative Empirical Evaluation of Recovery Policies under Controlled Failures",
+  "hypothesis": "Dynamic worker replacement and bounded retries (Policy R0) maintain 100% completed goodput under worker crashes, whereas disabling replacement (R1) degrades capacity and restricting retries (R2) yields unrecovered failures.",
+  "dataset_source": "TitanBench Canonical Scenarios",
+  "scenario_set": [
+    "TB-B-001",
+    "TB-C-001",
+    "TB-D-001",
+    "TB-E-001",
+    "TB-G-001"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1",
+    "BASELINE-B3"
+  ],
+  "independent_variables": {
+    "recovery_policy": [
+      "R0 (baseline-full-recovery)",
+      "R1 (no-worker-replacement)",
+      "R2 (limited-retry)",
+      "R3 (minimal-recovery)"
+    ]
+  },
+  "controlled_variables": {
+    "workload_jobs": "scenario-defined",
+    "worker_processes": "scenario-defined",
+    "work_units_per_job": 500,
+    "seed": 42,
+    "fault_injection_timing": "identical per scenario"
+  },
+  "dependent_metrics": [
+    "recovery_rate",
+    "unrecovered_failure_rate",
+    "total_execution_attempts",
+    "retries_initiated",
+    "lost_work_attempts",
+    "duplicate_work_ignored",
+    "goodput_jobs_per_sec",
+    "wall_clock_duration_sec",
+    "recovery_duration_sec"
+  ],
+  "trial_count": 3,
+  "seed_policy": "fixed: seed=42 across all policies",
+  "output_artifact_dir": "research/raw/e3_recovery_policies",
+  "notes": "Fair comparison holding all non-policy variables strictly constant."
+}

@@ -1,0 +1,65 @@
+{
+  "experiment_id": "EXP_TB-B-001_R3",
+  "scenario_id": "TB-B-001",
+  "scenario_class": "CLASS_B_SINGLE_WORKER_FAILURE",
+  "policy_id": "R3",
+  "policy_config": {
+    "policy_id": "R3",
+    "name": "minimal-recovery-disabled",
+    "description": "Minimal recovery: worker replacement is disabled and retry budget is strictly minimized (max_retries=1, replace_failed_workers=False).",
+    "replace_failed_workers": false,
+    "max_retries": 1,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "base_scenario": {
+    "scenario_id": "TB-B-001",
+    "name": "single-worker-failure-recovery",
+    "scenario_class": "CLASS_B_SINGLE_WORKER_FAILURE",
+    "description": "Controlled failure of one worker process with replacement and full job recovery.",
+    "scenario": {
+      "name": "tb-single-worker-fail",
+      "num_workers": 2,
+      "num_jobs": 10,
+      "work_units": 500,
+      "pattern": "uniform",
+      "seed": 42,
+      "max_retries": 3,
+      "replace_failed_workers": true,
+      "faults": [
+        {
+          "target_worker": "worker-0",
+          "kill_after_jobs": 2,
+          "target_job_id": null
+        }
+      ],
+      "duplicate_jobs": [],
+      "timeout": null
+    },
+    "expected_behavior": {
+      "expected_replay_valid": true,
+      "expected_run_state": "COMPLETED",
+      "expected_overall_status": "RECOVERED",
+      "expected_root_failures": 1,
+      "expected_root_class": "WORKER_FAILURE",
+      "expected_recovery_outcome": "RECOVERED",
+      "expected_worker_failures": 1,
+      "expected_worker_replacements": 1,
+      "min_retries": 1,
+      "max_retries": null,
+      "expected_completed_jobs": 10,
+      "expected_failed_jobs": 0,
+      "expected_duplicate_ignored": 0
+    }
+  },
+  "effective_scenario": {
+    "name": "tb-single-worker-fail_r3",
+    "workers": 2,
+    "jobs": 10,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 1,
+    "replace_failed_workers": false
+  }
+}

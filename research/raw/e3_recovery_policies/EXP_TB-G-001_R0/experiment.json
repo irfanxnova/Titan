@@ -1,0 +1,65 @@
+{
+  "experiment_id": "EXP_TB-G-001_R0",
+  "scenario_id": "TB-G-001",
+  "scenario_class": "CLASS_G_CAPACITY_LOSS",
+  "policy_id": "R0",
+  "policy_config": {
+    "policy_id": "R0",
+    "name": "baseline-full-recovery",
+    "description": "Standard Titan recovery: automatic worker replacement and default retry budget (max_retries=3).",
+    "replace_failed_workers": true,
+    "max_retries": 3,
+    "backoff_factor": 0.0
+  },
+  "repetitions": 2,
+  "base_scenario": {
+    "scenario_id": "TB-G-001",
+    "name": "unreplaced-worker-capacity-loss",
+    "scenario_class": "CLASS_G_CAPACITY_LOSS",
+    "description": "Worker failure without replacement (replace_failed_workers=False); degraded pool completes workload.",
+    "scenario": {
+      "name": "tb-capacity-loss",
+      "num_workers": 2,
+      "num_jobs": 10,
+      "work_units": 500,
+      "pattern": "uniform",
+      "seed": 42,
+      "max_retries": 3,
+      "replace_failed_workers": false,
+      "faults": [
+        {
+          "target_worker": "worker-0",
+          "kill_after_jobs": 2,
+          "target_job_id": null
+        }
+      ],
+      "duplicate_jobs": [],
+      "timeout": null
+    },
+    "expected_behavior": {
+      "expected_replay_valid": true,
+      "expected_run_state": "COMPLETED",
+      "expected_overall_status": "RECOVERED",
+      "expected_root_failures": 1,
+      "expected_root_class": "WORKER_FAILURE",
+      "expected_recovery_outcome": "RECOVERED",
+      "expected_worker_failures": 1,
+      "expected_worker_replacements": 0,
+      "min_retries": 1,
+      "max_retries": null,
+      "expected_completed_jobs": 10,
+      "expected_failed_jobs": 0,
+      "expected_duplicate_ignored": 0
+    }
+  },
+  "effective_scenario": {
+    "name": "tb-capacity-loss_r0",
+    "workers": 2,
+    "jobs": 10,
+    "work_units": 500,
+    "pattern": "uniform",
+    "seed": 42,
+    "max_retries": 3,
+    "replace_failed_workers": true
+  }
+}

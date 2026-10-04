@@ -1,0 +1,40 @@
+{
+  "evaluation_id": "E7_SYSTEM_ABLATIONS",
+  "research_question": "RQ6",
+  "title": "Systematic Mechanism Ablation: Quantifying the Impact of Titan Architecture Components",
+  "hypothesis": "Ablating core mechanisms (worker replacement, retry budget, deterministic tracing, replay validation) measurably changes recovery outcomes, throughput, or diagnostic auditability.",
+  "dataset_source": "TitanBench Controlled Scenarios & Synthetic Workloads",
+  "scenario_set": [
+    "TB-B-001",
+    "TB-D-001",
+    "TB-E-001",
+    "overhead-medium"
+  ],
+  "policies_or_baselines": [
+    "BASELINE-B1"
+  ],
+  "independent_variables": {
+    "ablated_mechanism": [
+      "A1: No Worker Replacement (replace_failed_workers=False)",
+      "A2: Limited Retries (max_retries=1)",
+      "A3: No Deterministic Tracing (enable_tracing=False)",
+      "A4: Relaxed Replay Verification (no invariant state checking)",
+      "A5: Alternative Fail-Fast Recovery (Policy R3)"
+    ]
+  },
+  "controlled_variables": {
+    "scenario_workload": "held identical per ablation pair",
+    "fault_injection": "held identical per ablation pair",
+    "seed": 42
+  },
+  "dependent_metrics": [
+    "recovery_rate_delta",
+    "attempt_overhead_delta",
+    "duration_delta_sec",
+    "diagnostic_fidelity_loss"
+  ],
+  "trial_count": 3,
+  "seed_policy": "fixed: seed=42",
+  "output_artifact_dir": "research/raw/e7_ablations",
+  "notes": "Answers 'Which Titan mechanisms actually matter?' under controlled comparison."
+}

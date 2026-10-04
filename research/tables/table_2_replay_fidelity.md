@@ -1,0 +1,6 @@
+| Evaluation Case | Trials (N) | Events | Trace (KB) | Replay Valid (%) | Equivalence (%) | Divergences | First Divergence Category | Result Assessment |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| exact_clean_trace | 3 | 46 | 7.09 KB | 100.0% | 100.0% | 0 | None (Identical) | VERIFIED (100%) |
+| exact_worker_crash_trace | 3 | 53 | 8.14 KB | 100.0% | 100.0% | 0 | None (Identical) | VERIFIED (100%) |
+| synthetic_divergence_trace | 3 | 53 | 8.18 KB | 100.0% | 0.0% | 3 | WORKER | VERIFIED (100%) |
+| malformed_corrupted_trace | 3 | 1 | 0.09 KB | 0.0% | 0.0% | 9 | VALIDATION_ERROR | VERIFIED (100%) |
