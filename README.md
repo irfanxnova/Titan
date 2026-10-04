@@ -14,11 +14,19 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 6: Replay Fidelity & Divergence Detection)
+## Current Status (Milestone 7: Failure Classification & Root-Cause Analysis)
 
-Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, and Replay Fidelity / Divergence Detection**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, observational trace replay, and automated fidelity divergence detection.
+Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, Replay Fidelity / Divergence Detection, and Deterministic Failure Classification & Root-Cause Analysis**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, observational trace replay, automated fidelity divergence detection, and deterministic evidence-based root-cause failure analysis.
 
 ### What Currently Exists
+- **Deterministic Failure Classification & Root-Cause Analysis (`src/titan/analysis.py`)**:
+  - Deterministic rule-based analysis consuming canonical traces, replay state, and divergence results without mutating them.
+  - Answers what failed, where, which logical entity was affected, immediate failure mode, recovery action, and recovery outcome.
+  - Failure taxonomy (`FailureClass`): `WORKER_FAILURE`, `JOB_FAILURE`, `LOST_EXECUTION`, `RETRY_EXHAUSTION`, `OWNERSHIP_FAILURE`, `REPLAY_DIVERGENCE`, and `RUN_FAILURE`.
+  - Distinguishes root causes from downstream consequences (e.g., worker crash is root cause; lost execution is a consequence).
+  - Reconstructs strictly ordered causal chains (`CausalChainNode`) from `ROOT_CAUSE` -> `CONSEQUENCE` -> `RECOVERY_ACTION` -> `TERMINAL_OUTCOME` ordered by canonical sequence numbers (`seq`).
+  - Classifies recovery status (`RecoveryOutcome`): `RECOVERED`, `UNRECOVERED`, or `NOT_APPLICABLE`.
+  - First-class CLI support via `analyze` with human-readable and structured JSON reports (`AnalysisReport`).
 - **Replay Fidelity & Divergence Detection (`src/titan/replay.py`)**:
   - Compares observed execution traces or replay results against expected deterministic execution contracts.
   - Explicit divergence model (`DivergenceCategory`, `DivergenceRecord`) distinguishing `EVENT`, `STATE`, `OWNERSHIP`, `RETRY`, `WORKER`, and `OUTCOME` divergences.
@@ -155,6 +163,22 @@ Compare traces with structured JSON divergence output:
 python src/titan/cli.py replay trace.json --compare expected_trace.json --json
 ```
 
+### Analyzing Execution Traces
+Perform deterministic failure classification and root-cause analysis on a trace:
+```powershell
+python src/titan/cli.py analyze trace.json
+```
+
+Output structured failure analysis report as JSON:
+```powershell
+python src/titan/cli.py analyze trace.json --json
+```
+
+Perform failure analysis with expected trace divergence detection:
+```powershell
+python src/titan/cli.py analyze trace.json --expected expected_trace.json
+```
+
 ### Running Custom Workloads & Fault Injection
 Execute a custom workload with deterministic failure injection:
 ```powershell
@@ -167,7 +191,7 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 103-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 116-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```

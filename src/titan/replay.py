@@ -535,7 +535,8 @@ class ReplayEngine:
             if event.worker_id:
                 w = state.workers.get(event.worker_id)
                 if w:
-                    w.status = ReplayWorkerStatus.IDLE
+                    if w.status != ReplayWorkerStatus.FAILED:
+                        w.status = ReplayWorkerStatus.IDLE
                     w.current_job_id = None
                     w.current_attempt_id = None
                     w.completed_count += 1
@@ -560,7 +561,8 @@ class ReplayEngine:
             if event.worker_id:
                 w = state.workers.get(event.worker_id)
                 if w:
-                    w.status = ReplayWorkerStatus.IDLE
+                    if w.status != ReplayWorkerStatus.FAILED:
+                        w.status = ReplayWorkerStatus.IDLE
                     w.current_job_id = None
                     w.current_attempt_id = None
                 state.active_ownership.pop(event.worker_id, None)

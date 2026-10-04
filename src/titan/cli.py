@@ -14,6 +14,7 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from titan import __version__
+from titan.analysis import FailureAnalyzer
 from titan.config import TitanConfig
 from titan.scenario import (
     PREDEFINED_SCENARIOS,
@@ -169,6 +170,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compare the replayed trace against an expected trace file for fidelity and divergence detection.",
     )
 
+    # 'analyze' subcommand
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Perform deterministic failure classification and root-cause analysis on a trace.",
+    )
+    analyze_parser.add_argument(
+        "trace_file",
+        type=str,
+        help="Path to JSON execution trace file.",
+    )
+    analyze_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output structured failure analysis report formatted as JSON.",
+    )
+    analyze_parser.add_argument(
+        "--expected",
+        "--compare",
+        dest="expected_trace_file",
+        type=str,
+        default=None,
+        help="Optional reference trace file to detect and analyze execution divergence.",
+    )
+
     return parser
 
 
@@ -180,7 +205,7 @@ def handle_status(json_output: bool = False) -> int:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 6: Replay Fidelity & Divergence Detection",
+            "milestone": "Milestone 7: Failure Classification & Root-Cause Analysis",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
@@ -190,10 +215,10 @@ def handle_status(json_output: bool = False) -> int:
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   6 (Replay Fidelity & Divergence Detection)")
+        print("  Milestone:   7 (Failure Classification & Root-Cause Analysis)")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (Replay Fidelity Active)")
+        print("  State:       Operational (Failure Analysis Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
 
     return 0
@@ -473,6 +498,101 @@ def handle_replay(
     return 0 if result.valid else 1
 
 
+def handle_analyze(
+    trace_file: str,
+    json_output: bool = False,
+    expected_trace_file: str | None = None,
+) -> int:
+    """Analyze a structured execution trace for failures, causal chains, and recovery."""
+    path = Path(trace_file)
+    if not path.exists():
+        print(f"Error: Trace file not found: {trace_file}", file=sys.stderr)
+        return 1
+
+    expected_path = Path(expected_trace_file) if expected_trace_file else None
+    if expected_path and not expected_path.exists():
+        print(f"Error: Expected trace file not found: {expected_trace_file}", file=sys.stderr)
+        return 1
+
+    try:
+        report = FailureAnalyzer.analyze_file(path, expected_path=expected_path)
+    except Exception as exc:
+        print(f"Error: Failed to analyze trace: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(report.to_json(indent=2))
+    else:
+        print("=" * 66)
+        print("Titan Deterministic Failure & Root-Cause Analysis Report")
+        print("=" * 66)
+        print(f"  Trace File:                    {trace_file}")
+        if expected_trace_file:
+            print(f"  Expected Trace File:           {expected_trace_file}")
+        trace_status_str = "VALID" if report.valid else "INVALID (Violations Detected)"
+        print(f"  Trace Integrity:               {trace_status_str}")
+        print(f"  Overall Run Status:            {report.overall_status}")
+        print(f"  Total Events Processed:        {report.total_events}")
+        print(f"  Final Reconstructed Run State: {report.reconstructed_run_state}")
+        print(f"  Root Failures Detected:        {report.root_failures_count}")
+        print(f"  Downstream Consequences:       {report.consequences_count}")
+
+        if report.failure_classes_summary:
+            print("\n  Failure Classes Summary:")
+            for fclass, count in sorted(report.failure_classes_summary.items()):
+                print(f"    {fclass:<28} {count}")
+
+        jobs_str = ", ".join(report.affected_jobs) if report.affected_jobs else "None"
+        workers_str = ", ".join(report.affected_workers) if report.affected_workers else "None"
+        print(f"\n  Affected Logical Entities:")
+        print(f"    Jobs ({len(report.affected_jobs)}):     {jobs_str}")
+        print(f"    Workers ({len(report.affected_workers)}):  {workers_str}")
+
+        print(f"\n  Recovery Status Summary:")
+        for rec_k, rec_v in sorted(report.recovery_summary.items()):
+            print(f"    {rec_k:<28} {rec_v}")
+
+        if report.root_failures:
+            print(f"\n  Root Failure Details & Causal Chains ({len(report.root_failures)}):")
+            for idx, rf in enumerate(report.root_failures, 1):
+                loc_info = f"seq {rf.seq}" if rf.seq is not None else "N/A"
+                print(f"\n    [{idx}] Failure ID: {rf.failure_id}")
+                print(f"        Class:           {rf.failure_class.value}")
+                print(f"        Severity:        {rf.severity.value}")
+                print(f"        Location:        {loc_info}")
+                print(f"        Affected Entity: {rf.affected_entity}")
+                print(f"        Immediate Cause: {rf.immediate_cause}")
+                print(f"        Recovery Action: {rf.recovery_action or 'None'}")
+                print(f"        Recovery Status: {rf.recovery_outcome.value}")
+                print(f"        Final Outcome:   {rf.final_outcome or 'N/A'}")
+                print(f"        Explanation:     {rf.explanation}")
+
+                if rf.causal_chain:
+                    print("        Causal Chain:")
+                    for node in rf.causal_chain:
+                        role_str = node.role.value if hasattr(node.role, "value") else str(node.role)
+                        target_info = []
+                        if node.job_id:
+                            target_info.append(f"job={node.job_id}")
+                        if node.attempt_id is not None:
+                            target_info.append(f"att={node.attempt_id}")
+                        if node.worker_id:
+                            target_info.append(f"worker={node.worker_id}")
+                        t_str = f" ({', '.join(target_info)})" if target_info else ""
+                        print(
+                            f"          [seq {node.seq:>3}] {role_str:<16} {node.event_type}{t_str}: {node.description}"
+                        )
+
+        if report.validation_errors:
+            print(f"\n  Validation Errors ({len(report.validation_errors)}):")
+            for err in report.validation_errors:
+                print(f"    - {err}")
+
+        print("=" * 66)
+
+    return 0 if (report.valid and report.overall_status in ("CLEAN", "RECOVERED")) else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -504,6 +624,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "replay":
         return handle_replay(
+            trace_file=args.trace_file,
+            json_output=args.json,
+            expected_trace_file=args.expected_trace_file,
+        )
+
+    if args.command == "analyze":
+        return handle_analyze(
             trace_file=args.trace_file,
             json_output=args.json,
             expected_trace_file=args.expected_trace_file,

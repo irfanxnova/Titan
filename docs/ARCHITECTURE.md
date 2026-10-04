@@ -6,7 +6,7 @@ This document serves as the architectural source of truth for Titan. It explicit
 
 ## 1. Confirmed Architecture
 
-As of Milestone 6, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, and Replay Fidelity / Divergence Detection**:
+As of Milestone 7, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, Replay Fidelity / Divergence Detection, and Deterministic Failure Classification & Root-Cause Analysis**:
 
 ```
                                   [ Titan CLI ]
@@ -230,11 +230,53 @@ Implemented in `src/titan/replay.py`:
   - Comparison operates over structured trace records and reconstructed state; it does not perform deep AST code diffs of workload functions.
   - While single-worker deterministic executions produce bit-for-bit identical traces across separate physical runs, multi-worker concurrent executions subject to OS process scheduling jitter may interleave independent jobs differently unless synchronized by the coordinator.
 
-### 1.11 Known Limitations of Milestone 6
+### 1.11 Deterministic Failure Classification & Root-Cause Analysis
+Implemented in `src/titan/analysis.py`:
+- **Consuming Architecture & Layering**:
+  The failure analysis layer is strictly observational and analytical. It builds directly upon the authoritative pipeline:
+  ```
+  runtime state ──> event trace ──> replay engine ──> divergence engine ──> failure analysis
+  (authoritative)   (canonical)     (reconstructed)   (comparison)          (evidence-based)
+  ```
+  The failure-analysis layer consumes these sources but never mutates them, maintaining a strict architectural boundary so that analysis never becomes a second runtime control plane.
+- **Core Diagnostic Questions Answered**:
+  1. *WHAT failed?*: Explicitly classified via `failure_class` (e.g. `WORKER_FAILURE`, `LOST_EXECUTION`, `RETRY_EXHAUSTION`).
+  2. *WHERE did it fail?*: Localized to canonical sequence number `seq`, worker ID, job ID, and attempt ID.
+  3. *WHICH logical entity was affected?*: Identified via `affected_entity` (e.g. `worker:worker-0`, `job:job-000003`, `attempt:job-000003#1`, `run`).
+  4. *WHAT was the immediate failure mode?*: Captured in `immediate_cause` (e.g. non-zero exit code, unhandled task exception, missing worker).
+  5. *WHAT recovery action followed?*: Documented in `recovery_action` (e.g. `WORKER_REPLACED`, `RETRY_SCHEDULED`, `JOB_REASSIGNED`).
+  6. *WAS the final outcome recovered or unrecovered?*: Formally classified via `recovery_outcome` (`RECOVERED`, `UNRECOVERED`, or `NOT_APPLICABLE`).
+  7. *CAN the failure be classified deterministically from the available evidence?*: Yes, 100% deterministic rule-based analysis without probabilistic inference or machine-learning heuristics.
+- **Deterministic Failure Taxonomy (`FailureClass`)**:
+  - `WORKER_FAILURE`: Worker process terminates unexpectedly while execution is active.
+  - `JOB_FAILURE`: Independent task/attempt execution error independent of worker replacement semantics.
+  - `LOST_EXECUTION`: An active execution attempt becomes lost because its worker disappears.
+  - `RETRY_EXHAUSTION`: A failed or lost job cannot obtain another permitted retry under policy.
+  - `OWNERSHIP_FAILURE`: Trace or replay validation reveals an invalid or inconsistent ownership transition.
+  - `REPLAY_DIVERGENCE`: Replay fidelity comparison detects an execution divergence.
+  - `RUN_FAILURE`: The overall run terminates in an unrecovered failure state.
+- **Separation of Root Cause vs. Downstream Consequences**:
+  - Explicit distinction between the initiating root failure and subsequent consequences or recovery actions.
+  - Example causal progression:
+    $$\text{WORKER\_FAILURE} \longrightarrow \text{JOB\_LOST (Consequence)} \longrightarrow \text{RETRY\_SCHEDULED (Recovery)} \longrightarrow \text{JOB\_COMPLETED (Outcome)}$$
+  - The analysis layer preserves `WORKER_FAILURE` as the sole root cause; `JOB_LOST` is cataloged as a downstream consequence rather than an independent root cause.
+  - Multiple genuinely independent failures (e.g., separate worker crashes or distinct task errors) are preserved separately and deterministically.
+- **Deterministic Causal Chains (`CausalChainNode`)**:
+  - Reconstructs the exact, ordered sequence of evidence leading from root failure to consequence, recovery actions, and terminal outcome.
+  - Causal chains are ordered strictly by canonical event sequence numbers (`seq`). Wall-clock timestamps are never used to infer or establish causality.
+- **Recovery Outcome Semantics (`RecoveryOutcome`)**:
+  - `RECOVERED`: All affected logical jobs successfully retried and reached `COMPLETED`.
+  - `UNRECOVERED`: Retries exhausted or unrecovered, job in terminal `FAILED`, or run unrecovered.
+  - `NOT_APPLICABLE`: For observational replay divergence or informational checks.
+- **Integration with Replay and Divergence**:
+  - Structurally invalid traces are rejected upfront via existing `ReplayEngine.replay()` validation results rather than attempting unsupported analysis.
+  - Replay divergence comparison results from `ReplayFidelityEngine.compare()` are cleanly integrated as `REPLAY_DIVERGENCE` records with `NOT_APPLICABLE` recovery status.
+
+### 1.12 Known Limitations of Milestone 7
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state (persistent distributed logs are not yet implemented).
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
 - **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.
-- **Observational Trace Verification**: Replay validates logical consistency and state transitions from captured traces, but does not simulate network latency or re-run external side effects.
+- **Rule-Based Failure Analysis**: Analysis operates strictly over deterministic evidence captured in the canonical trace; it does not speculate or infer causes that the trace does not explicitly support.
 
 ---
 

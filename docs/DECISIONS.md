@@ -279,6 +279,36 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Provides an automated, deterministic regression and fidelity testing mechanism; enables root-cause failure analysis by isolating the earliest point of divergence; establishes the comparative evaluation baseline for future adaptive execution policies.
   - *Negative*: Comparison requires an authoritative expected trace or model; concurrent multi-process executions with identical seeds may exhibit thread/process interleaving differences unless isolated to single-worker execution or strictly synchronized.
 
+---
+
+## ADR-017: Deterministic Failure Classification and Root-Cause Analysis Layer
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestones 4 through 6 established structured execution tracing, deterministic replay, and fidelity comparison. While these components observe and reconstruct historical execution, diagnosing what failed, why it failed, which logical entities were impacted, and whether recovery succeeded required manual inspection. In distributed systems research, failure diagnosis must be deterministic, reproducible, and strictly evidence-based, avoiding speculative or probabilistic inference.
+- **Decision**:
+  1. Build a dedicated failure-classification and root-cause analysis layer (`FailureAnalyzer` in `src/titan/analysis.py`).
+  2. Implement this layer as strictly analytical and observational: it consumes canonical event traces, replay state, and divergence results without mutating them, ensuring it never becomes a second runtime control plane.
+  3. Define a structured failure taxonomy (`FailureClass`):
+     - `WORKER_FAILURE`: Worker process crashes/terminates unexpectedly mid-run.
+     - `JOB_FAILURE`: Independent task/attempt execution error independent of worker replacement semantics.
+     - `LOST_EXECUTION`: An in-flight execution attempt lost due to worker disappearance.
+     - `RETRY_EXHAUSTION`: A failed/lost job cannot obtain another permitted retry under policy.
+     - `OWNERSHIP_FAILURE`: Invalid or inconsistent ownership transition.
+     - `REPLAY_DIVERGENCE`: Deterministic divergence between replayed and expected execution.
+     - `RUN_FAILURE`: Unrecovered terminal run failure.
+  4. Explicitly separate root causes from downstream consequences. For example, in a worker crash, `WORKER_FAILURE` is the root cause, whereas `JOB_LOST` is cataloged as a downstream consequence and `RETRY_SCHEDULED` / `WORKER_REPLACED` as recovery actions.
+  5. Reconstruct ordered causal chains (`CausalChainNode`) for every detected failure, tracking evidence from `ROOT_CAUSE` -> `CONSEQUENCE` -> `RECOVERY_ACTION` -> `TERMINAL_OUTCOME` ordered strictly by canonical sequence numbers (`seq`), never wall-clock timestamps.
+  6. Deterministically classify recovery outcomes (`RecoveryOutcome`):
+     - `RECOVERED`: All affected logical jobs reached `COMPLETED`.
+     - `UNRECOVERED`: At least one affected job reached terminal `FAILED` or run terminated unrecovered.
+     - `NOT_APPLICABLE`: For observational replay divergence or informational checks.
+  7. Reject structurally invalid traces upfront using existing `ReplayEngine.replay()` validation results rather than attempting unsupported analysis.
+  8. Expose first-class CLI support via `python src/titan/cli.py analyze <trace-file> [--json] [--expected <trace>]`.
+- **Consequences**:
+  - *Positive*: Provides an automated, deterministic diagnostic layer answering what failed, where, why, and whether recovery succeeded; preserves clear causal chains; guarantees identical output for identical traces without probabilistic heuristics.
+  - *Negative*: Analysis is constrained by evidence present in the canonical trace; unobserved external anomalies outside the trace schema cannot be diagnosed.
+
 
 
 
