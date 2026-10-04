@@ -13,6 +13,7 @@ from typing import Sequence
 from titan.job import Job
 from titan.metrics import RunMetrics
 from titan.runtime import FailureConfig, StaticRuntime
+from titan.trace import ExecutionTrace
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,7 @@ class ScenarioResult:
     fault_injected: bool
     fault_target: str | None
     fault_point: int | None
+    trace: ExecutionTrace | None = None
 
     def to_dict(self) -> dict:
         """Serialize scenario result to dictionary."""
@@ -182,6 +184,7 @@ class ScenarioResult:
                 "fault": fault_payload,
             },
             "metrics": self.metrics.to_dict(),
+            "trace": self.trace.to_list() if self.trace is not None else [],
         }
 
 
@@ -198,8 +201,10 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         replace_failed_workers=scenario.replace_failed_workers,
         failure_config=failure_cfg,
     )
+    trace = None
     try:
         metrics, _ = runtime.run_workload(jobs, timeout=scenario.timeout)
+        trace = runtime.trace
     finally:
         runtime.stop()
 
@@ -209,6 +214,7 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         fault_injected=scenario.fault_config is not None,
         fault_target=scenario.fault_config.target_worker_id if scenario.fault_config else None,
         fault_point=scenario.fault_config.kill_after_jobs if scenario.fault_config else None,
+        trace=trace,
     )
 
 

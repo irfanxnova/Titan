@@ -7,7 +7,7 @@ import time
 from multiprocessing import Queue
 from typing import Any
 
-from titan.job import ExecutionAttempt, Job, JobAcquired, JobResult, JobStatus
+from titan.job import ExecutionAttempt, Job, JobAcquired, JobResult, JobStarted, JobStatus
 from titan.workload import execute_workload
 
 
@@ -77,6 +77,17 @@ def worker_process_main(
 
         # Step 3: Execute deterministic workload
         started_at = time.perf_counter()
+        job_started = JobStarted(
+            job_id=job.job_id,
+            worker_id=worker_id,
+            attempt_id=attempt_id,
+            started_at=started_at,
+        )
+        try:
+            event_queue.put(job_started)
+        except (ValueError, OSError):
+            break
+
         try:
             computed_value = execute_workload(job.work_units)
             completed_at = time.perf_counter()

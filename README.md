@@ -14,11 +14,16 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 3: Failure Injection + Recovery)
+## Current Status (Milestone 4: Structured Event Tracing & Execution History)
 
-Titan has implemented its **Failure-Aware Multi-Process Runtime**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, and capacity-restoring worker replacement.
+Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, and canonical execution event tracing.
 
 ### What Currently Exists
+- **Structured Execution Event Tracing (`src/titan/trace.py`)**:
+  - Canonical logical event model (`TraceEvent`) with monotonic sequence numbers (`seq`), explicit lifecycle event types (`EventType`), observation timestamps, and structured payloads.
+  - Lifecycle transitions: `RUN_STARTED`, `RUN_COMPLETED`, `WORKER_STARTED`, `WORKER_EXITED`, `WORKER_FAILED`, `WORKER_REPLACED`, `JOB_CREATED`, `JOB_ASSIGNED`, `JOB_STARTED`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_LOST`, `RETRY_SCHEDULED`, `JOB_REASSIGNED`.
+  - Strict separation of concerns: observational trace collector (`ExecutionTrace`) records history without competing with or influencing authoritative coordinator state.
+  - First-class JSON export and CLI visualization via `--trace` and `--trace-file`.
 - **Failure Detection & Process Lifecycle (`src/titan/runtime.py`)**:
   - Continuous health monitoring via OS process inspection (`process.is_alive()` and `process.exitcode`).
   - Strict categorization: normal shutdown, intentional test failure injection (`os._exit(42)`), and unexpected process crashes.
@@ -48,8 +53,8 @@ Titan has implemented its **Failure-Aware Multi-Process Runtime**, featuring in-
   - Computes wall-clock time, primary throughput (unique jobs/sec), attempt throughput, worker failures, retries, recovered jobs, permanently failed jobs, duplicate results ignored, and recovery duration.
 - **Authoritative Documentation**:
   - [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md): Non-negotiable principles, research scope, and non-goals.
-  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, and limitations.
-  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-013, including ADR-011 on job/attempt separation, ADR-012 on attempt lifecycle, and ADR-013 on deterministic scenarios).
+  - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Confirmed runtime architecture, execution model, failure recovery semantics, structured event tracing, and limitations.
+  - [DECISIONS.md](docs/DECISIONS.md): Architecture Decision Records (ADR-001 through ADR-014, including ADR-014 on structured event tracing).
   - [EXPERIMENTS.md](docs/EXPERIMENTS.md): Formal protocol template and completed trials for EXP-002.
 
 ### What Does NOT Exist Yet (Intentionally Unimplemented)
@@ -101,9 +106,19 @@ Run deterministic worker crash and recovery scenario:
 python src/titan/cli.py run --scenario worker-crash
 ```
 
-Run stress recovery scenario formatted as JSON:
+Run scenario with structured execution trace visualization:
+```powershell
+python src/titan/cli.py run --scenario worker-crash --trace
+```
+
+Run stress recovery scenario formatted as JSON (including trace array):
 ```powershell
 python src/titan/cli.py run --scenario stress-recovery --json
+```
+
+Export execution trace to a JSON file:
+```powershell
+python src/titan/cli.py run --scenario baseline --trace-file trace.json
 ```
 
 ### Running Custom Workloads & Fault Injection
@@ -118,7 +133,7 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 53-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 67-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```

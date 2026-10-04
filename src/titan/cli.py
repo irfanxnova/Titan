@@ -132,6 +132,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output metrics formatted as JSON.",
     )
+    run_parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="Display the structured execution trace events in sequential order.",
+    )
+    run_parser.add_argument(
+        "--trace-file",
+        type=str,
+        default=None,
+        help="Export the structured execution trace to a JSON file.",
+    )
 
     return parser
 
@@ -144,7 +155,7 @@ def handle_status(json_output: bool = False) -> int:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 3: Failure Injection + Recovery",
+            "milestone": "Milestone 4: Structured Event Tracing & Execution History",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
@@ -154,10 +165,10 @@ def handle_status(json_output: bool = False) -> int:
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   3 (Failure Injection + Recovery)")
+        print("  Milestone:   4 (Structured Event Tracing & Execution History)")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (Failure Recovery Active)")
+        print("  State:       Operational (Execution Event Tracing Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
 
     return 0
@@ -176,6 +187,8 @@ def handle_run(
     scenario_name: str | None = None,
     pattern: str = "uniform",
     seed: int = 42,
+    show_trace: bool = False,
+    trace_file: str | None = None,
 ) -> int:
     """Execute a workload batch and output verified performance and recovery metrics."""
     # Resolve scenario preset if specified
@@ -243,6 +256,9 @@ def handle_run(
     scenario_result = run_scenario(scenario)
     metrics = scenario_result.metrics
 
+    if trace_file and scenario_result.trace:
+        scenario_result.trace.save_to_file(trace_file)
+
     if json_output:
         payload = {
             "scenario": scenario_result.to_dict()["scenario"],
@@ -256,6 +272,7 @@ def handle_run(
                 "replace_workers": scenario.replace_failed_workers,
             },
             "metrics": metrics.to_dict(),
+            "trace": scenario_result.trace.to_list() if scenario_result.trace else [],
         }
         print(json.dumps(payload, indent=2))
     else:
@@ -288,6 +305,17 @@ def handle_run(
         print(f"  Avg Worker Compute:            {metrics.avg_processing_time * 1000:.3f} ms")
         print("=" * 66)
 
+        if show_trace and scenario_result.trace:
+            print("\n" + "=" * 66)
+            print(f"Execution Trace ({len(scenario_result.trace)} events)")
+            print("=" * 66)
+            for event in scenario_result.trace:
+                print(f"  {event}")
+            print("=" * 66)
+
+        if trace_file:
+            print(f"Trace saved to: {trace_file}")
+
     return 0
 
 
@@ -316,6 +344,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             scenario_name=args.scenario,
             pattern=args.pattern,
             seed=args.seed,
+            show_trace=args.trace,
+            trace_file=args.trace_file,
         )
 
     parser.print_help()

@@ -170,6 +170,40 @@ class JobAcquired:
 
 
 @dataclass(frozen=True)
+class JobStarted:
+    """Event emitted by a worker immediately before beginning workload computation."""
+
+    job_id: str
+    worker_id: str
+    attempt_id: int
+    started_at: float
+
+    def __init__(
+        self,
+        job_id: str,
+        worker_id: str,
+        attempt_id: int | None = None,
+        started_at: float = 0.0,
+        attempt: int | None = None,
+    ) -> None:
+        resolved = attempt_id if attempt_id is not None else (attempt if attempt is not None else 1)
+        object.__setattr__(self, "job_id", job_id)
+        object.__setattr__(self, "worker_id", worker_id)
+        object.__setattr__(self, "attempt_id", resolved)
+        object.__setattr__(self, "started_at", started_at)
+
+    @property
+    def attempt(self) -> int:
+        """Sequential attempt index (backward compatibility alias)."""
+        return self.attempt_id
+
+    @property
+    def key(self) -> AttemptKey:
+        """Composite identifier for the running execution attempt."""
+        return AttemptKey(self.job_id, self.attempt_id)
+
+
+@dataclass(frozen=True)
 class JobResult:
     """Immutable execution outcome and telemetry for a single execution attempt."""
 

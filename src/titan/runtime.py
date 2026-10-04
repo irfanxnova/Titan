@@ -22,10 +22,12 @@ from titan.job import (
     Job,
     JobAcquired,
     JobResult,
+    JobStarted,
     JobStatus,
     WorkerRecord,
 )
 from titan.metrics import RunMetrics
+from titan.trace import EventType, ExecutionTrace, TraceEvent
 from titan.worker import worker_process_main
 
 
@@ -91,6 +93,9 @@ class StaticRuntime:
         self._recovery_start_time: float | None = None
         self._recovery_end_time: float | None = None
 
+        # Structured Execution Event Tracing (Observational)
+        self._trace = ExecutionTrace()
+
     @property
     def is_running(self) -> bool:
         """Indicate whether worker processes are currently active."""
@@ -100,6 +105,11 @@ class StaticRuntime:
     def active_worker_count(self) -> int:
         """Count of currently alive worker processes."""
         return sum(1 for p in self._workers.values() if p.is_alive())
+
+    @property
+    def trace(self) -> ExecutionTrace:
+        """Observational execution trace for the current/most recent run."""
+        return self._trace
 
     # -------------------------------------------------------------------------
     # Coordinator Query Interface (Authoritative State Access)
@@ -207,6 +217,11 @@ class StaticRuntime:
                 replaced_worker_id=None,
                 spawned_at=time.perf_counter(),
             )
+            self._trace.emit(
+                EventType.WORKER_STARTED,
+                worker_id=worker_id,
+                data={"is_replacement": False},
+            )
 
         # Brief warm-up to allow OS to spawn and initialize child python runtimes
         time.sleep(0.1)
@@ -243,6 +258,11 @@ class StaticRuntime:
                         spawned_at=rec.spawned_at,
                         terminated_at=time.perf_counter(),
                     )
+                self._trace.emit(
+                    EventType.WORKER_EXITED,
+                    worker_id=worker_id,
+                    data={"clean_shutdown": True},
+                )
 
         self._is_running = False
 
@@ -271,6 +291,16 @@ class StaticRuntime:
             replaced_worker_id=dead_worker_id,
             spawned_at=time.perf_counter(),
         )
+        self._trace.emit(
+            EventType.WORKER_REPLACED,
+            worker_id=new_worker_id,
+            data={"replaced_worker_id": dead_worker_id},
+        )
+        self._trace.emit(
+            EventType.WORKER_STARTED,
+            worker_id=new_worker_id,
+            data={"is_replacement": True, "replaced_worker_id": dead_worker_id},
+        )
 
     # -------------------------------------------------------------------------
     # Work Submission & Attempt Registration
@@ -291,10 +321,20 @@ class StaticRuntime:
                 )
                 self._jobs_by_id[job.job_id] = logical_job
                 self._job_states[job.job_id] = JobStatus.PENDING
+                self._trace.emit(
+                    EventType.JOB_CREATED,
+                    job_id=job.job_id,
+                    data={"work_units": job.work_units, "max_retries": job.max_retries},
+                )
             self._register_and_enqueue_attempt(job)
         else:
             self._jobs_by_id[job.job_id] = job
             self._job_states[job.job_id] = JobStatus.PENDING
+            self._trace.emit(
+                EventType.JOB_CREATED,
+                job_id=job.job_id,
+                data={"work_units": job.work_units, "max_retries": job.max_retries},
+            )
             attempt = job.create_attempt(attempt_id=1)
             self._register_and_enqueue_attempt(attempt)
 
@@ -313,10 +353,7 @@ class StaticRuntime:
         """Drain all pending events from the event queue."""
         try:
             event = self._event_queue.get(timeout=timeout)
-            if isinstance(event, JobAcquired):
-                self._handle_job_acquired(event)
-            elif isinstance(event, JobResult):
-                self._handle_job_result(event)
+            self._dispatch_event(event)
         except queue.Empty:
             pass
 
@@ -324,12 +361,36 @@ class StaticRuntime:
         while True:
             try:
                 event = self._event_queue.get_nowait()
-                if isinstance(event, JobAcquired):
-                    self._handle_job_acquired(event)
-                elif isinstance(event, JobResult):
-                    self._handle_job_result(event)
+                self._dispatch_event(event)
             except queue.Empty:
                 break
+
+    def _dispatch_event(self, event: Any) -> None:
+        """Route incoming worker event to appropriate coordinator handler."""
+        if isinstance(event, JobAcquired):
+            self._handle_job_acquired(event)
+        elif isinstance(event, JobStarted):
+            self._handle_job_started(event)
+        elif isinstance(event, JobResult):
+            self._handle_job_result(event)
+
+    def _handle_job_started(self, event: JobStarted) -> None:
+        """Handle notification that a worker has begun computation on an attempt."""
+        attempt_key = AttemptKey(event.job_id, event.attempt_id)
+        if self._attempt_states.get(attempt_key) not in (
+            AttemptStatus.COMPLETED,
+            AttemptStatus.FAILED,
+            AttemptStatus.LOST,
+        ):
+            self._attempt_states[attempt_key] = AttemptStatus.RUNNING
+
+        self._trace.emit(
+            EventType.JOB_STARTED,
+            job_id=event.job_id,
+            attempt_id=event.attempt_id,
+            worker_id=event.worker_id,
+            timestamp=event.started_at,
+        )
 
     def _handle_job_acquired(self, event: JobAcquired) -> None:
         """Record in-flight ownership of an execution attempt by a specific worker."""
@@ -361,6 +422,14 @@ class StaticRuntime:
         # If the worker is already known to be dead, immediately recover/requeue
         if event.worker_id in self._handled_dead_workers:
             self._attempt_states[attempt_key] = AttemptStatus.LOST
+            self._trace.emit(
+                EventType.JOB_LOST,
+                job_id=event.job_id,
+                attempt_id=attempt.attempt_id,
+                worker_id=event.worker_id,
+                data={"reason": f"Worker {event.worker_id} already terminated"},
+                timestamp=event.acquired_at,
+            )
             if event.job_id not in self._completed_jobs:
                 if attempt.attempt_id < orig_job.max_retries:
                     self._job_states[event.job_id] = JobStatus.RETRY_PENDING
@@ -368,9 +437,15 @@ class StaticRuntime:
                     self._jobs_recovered += 1
                     retry_attempt = orig_job.create_attempt(attempt_id=attempt.attempt_id + 1)
                     self._register_and_enqueue_attempt(retry_attempt)
+                    self._trace.emit(
+                        EventType.RETRY_SCHEDULED,
+                        job_id=orig_job.job_id,
+                        attempt_id=retry_attempt.attempt_id,
+                        data={"previous_attempt": attempt.attempt_id, "reason": "worker_failure"},
+                    )
                 else:
                     self._job_states[event.job_id] = JobStatus.FAILED
-                    self._failed_jobs[event.job_id] = JobResult(
+                    fail_res = JobResult(
                         job_id=orig_job.job_id,
                         worker_id=event.worker_id,
                         status=JobStatus.FAILED,
@@ -383,7 +458,16 @@ class StaticRuntime:
                         result=None,
                         error=f"Worker {event.worker_id} terminated and max retries ({orig_job.max_retries}) exceeded.",
                     )
+                    self._failed_jobs[event.job_id] = fail_res
                     self._jobs_permanently_failed += 1
+                    self._trace.emit(
+                        EventType.JOB_FAILED,
+                        job_id=orig_job.job_id,
+                        attempt_id=attempt.attempt_id,
+                        worker_id=event.worker_id,
+                        data={"error": fail_res.error, "max_retries_exceeded": True},
+                        timestamp=fail_res.completed_at,
+                    )
             return
 
         # Normal ownership establishment
@@ -394,6 +478,23 @@ class StaticRuntime:
         if event.worker_id not in self._in_flight:
             self._in_flight[event.worker_id] = {}
         self._in_flight[event.worker_id][event.job_id] = attempt
+
+        if event.attempt_id == 1:
+            self._trace.emit(
+                EventType.JOB_ASSIGNED,
+                job_id=event.job_id,
+                attempt_id=event.attempt_id,
+                worker_id=event.worker_id,
+                timestamp=event.acquired_at,
+            )
+        else:
+            self._trace.emit(
+                EventType.JOB_REASSIGNED,
+                job_id=event.job_id,
+                attempt_id=event.attempt_id,
+                worker_id=event.worker_id,
+                timestamp=event.acquired_at,
+            )
 
     def _handle_job_result(self, result: JobResult) -> CompletionCategory:
         """Process an execution result with deduplication and retry enforcement."""
@@ -431,6 +532,18 @@ class StaticRuntime:
             self._attempt_states[attempt_key] = AttemptStatus.COMPLETED
             if self._recovery_start_time is not None:
                 self._recovery_end_time = time.perf_counter()
+            self._trace.emit(
+                EventType.JOB_COMPLETED,
+                job_id=result.job_id,
+                attempt_id=result.attempt_id,
+                worker_id=result.worker_id,
+                data={
+                    "result": result.result,
+                    "processing_duration": round(result.processing_duration, 6),
+                    "total_latency": round(result.total_latency, 6),
+                },
+                timestamp=result.completed_at,
+            )
             return CompletionCategory.VALID
 
         elif result.status == JobStatus.FAILED:
@@ -454,11 +567,25 @@ class StaticRuntime:
                     )
                 )
                 self._register_and_enqueue_attempt(next_attempt)
+                self._trace.emit(
+                    EventType.RETRY_SCHEDULED,
+                    job_id=result.job_id,
+                    attempt_id=next_attempt.attempt_id,
+                    data={"previous_attempt": result.attempt_id, "reason": "job_failure"},
+                )
                 return CompletionCategory.VALID
             else:
                 self._failed_jobs[result.job_id] = result
                 self._job_states[result.job_id] = JobStatus.FAILED
                 self._jobs_permanently_failed += 1
+                self._trace.emit(
+                    EventType.JOB_FAILED,
+                    job_id=result.job_id,
+                    attempt_id=result.attempt_id,
+                    worker_id=result.worker_id,
+                    data={"error": result.error, "max_retries_exceeded": True},
+                    timestamp=result.completed_at,
+                )
                 return CompletionCategory.VALID
 
         return CompletionCategory.REJECTED
@@ -471,6 +598,13 @@ class StaticRuntime:
                     continue
                 self._handled_dead_workers.add(worker_id)
                 self._worker_failures += 1
+                exit_code = process.exitcode
+
+                self._trace.emit(
+                    EventType.WORKER_FAILED,
+                    worker_id=worker_id,
+                    data={"exit_code": exit_code},
+                )
 
                 # Update worker record termination time
                 if worker_id in self._worker_registry:
@@ -501,6 +635,14 @@ class StaticRuntime:
                     orig_job = self._jobs_by_id.get(attempt.job_id)
                     max_retries = orig_job.max_retries if orig_job else self.max_retries
 
+                    self._trace.emit(
+                        EventType.JOB_LOST,
+                        job_id=attempt.job_id,
+                        attempt_id=attempt.attempt_id,
+                        worker_id=worker_id,
+                        data={"reason": f"Worker {worker_id} terminated unexpectedly (exit code {exit_code})"},
+                    )
+
                     if attempt.attempt_id < max_retries:
                         self._job_states[attempt.job_id] = JobStatus.RETRY_PENDING
                         self._total_retries += 1
@@ -517,6 +659,12 @@ class StaticRuntime:
                             )
                         )
                         self._register_and_enqueue_attempt(next_attempt)
+                        self._trace.emit(
+                            EventType.RETRY_SCHEDULED,
+                            job_id=attempt.job_id,
+                            attempt_id=next_attempt.attempt_id,
+                            data={"previous_attempt": attempt.attempt_id, "reason": "worker_failure"},
+                        )
                     else:
                         # Retry limit exceeded; mark permanently failed
                         self._job_states[attempt.job_id] = JobStatus.FAILED
@@ -535,6 +683,14 @@ class StaticRuntime:
                         )
                         self._failed_jobs[attempt.job_id] = fail_res
                         self._jobs_permanently_failed += 1
+                        self._trace.emit(
+                            EventType.JOB_FAILED,
+                            job_id=attempt.job_id,
+                            attempt_id=attempt.attempt_id,
+                            worker_id=worker_id,
+                            data={"error": fail_res.error, "max_retries_exceeded": True},
+                            timestamp=fail_res.completed_at,
+                        )
 
                 # Clear ownership for the dead worker
                 self._in_flight.pop(worker_id, None)
@@ -574,12 +730,42 @@ class StaticRuntime:
         self._duplicate_results_ignored = 0
         self._recovery_start_time = None
         self._recovery_end_time = None
+        self._trace.clear()
 
         wall_clock_start = time.perf_counter()
+
+        self._trace.emit(
+            EventType.RUN_STARTED,
+            data={
+                "total_jobs": len(jobs),
+                "num_workers": self.num_workers,
+                "max_retries": self.max_retries,
+            },
+        )
+
+        # Record active workers present at start of run
+        for wid, rec in self._worker_registry.items():
+            if wid in self._workers and self._workers[wid].is_alive():
+                self._trace.emit(
+                    EventType.WORKER_STARTED,
+                    worker_id=wid,
+                    data={"is_replacement": rec.is_replacement, "replaced_worker_id": rec.replaced_worker_id},
+                )
 
         # Handle zero-job edge case immediately
         if not jobs:
             wall_clock_end = time.perf_counter()
+            self._trace.emit(
+                EventType.RUN_COMPLETED,
+                data={
+                    "wall_clock_duration": max(0.000001, wall_clock_end - wall_clock_start),
+                    "total_submitted": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "retries": 0,
+                    "worker_failures": 0,
+                },
+            )
             metrics = RunMetrics.calculate(
                 total_unique_submitted=0,
                 completed_jobs={},
@@ -606,10 +792,20 @@ class StaticRuntime:
                         max_retries=item.max_retries,
                     )
                 self._job_states[item.job_id] = JobStatus.PENDING
+                self._trace.emit(
+                    EventType.JOB_CREATED,
+                    job_id=item.job_id,
+                    data={"work_units": item.work_units, "max_retries": item.max_retries},
+                )
                 self._register_and_enqueue_attempt(item)
             else:
                 self._jobs_by_id[item.job_id] = item
                 self._job_states[item.job_id] = JobStatus.PENDING
+                self._trace.emit(
+                    EventType.JOB_CREATED,
+                    job_id=item.job_id,
+                    data={"work_units": item.work_units, "max_retries": item.max_retries},
+                )
                 attempt_1 = item.create_attempt(attempt_id=1)
                 self._register_and_enqueue_attempt(attempt_1)
 
@@ -633,6 +829,18 @@ class StaticRuntime:
 
         wall_clock_end = time.perf_counter()
         wall_clock_duration = max(0.000001, wall_clock_end - wall_clock_start)
+
+        self._trace.emit(
+            EventType.RUN_COMPLETED,
+            data={
+                "wall_clock_duration": round(wall_clock_duration, 6),
+                "total_submitted": len(self._jobs_by_id),
+                "completed": len(self._completed_jobs),
+                "failed": len(self._failed_jobs),
+                "retries": self._total_retries,
+                "worker_failures": self._worker_failures,
+            },
+        )
 
         # Compute recovery duration
         recovery_time = 0.0

@@ -6,7 +6,7 @@ This document serves as the architectural source of truth for Titan. It explicit
 
 ## 1. Confirmed Architecture
 
-As of Milestone 3, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime**:
+As of Milestone 4, the confirmed architecture consists of the **Failure-Aware Multi-Process Runtime with Structured Event Tracing**:
 
 ```
                                   [ Titan CLI ]
@@ -131,7 +131,40 @@ Implemented in `src/titan/scenario.py`:
   - No Byzantine fault models or network split-brain simulations.
   - No external orchestrators or distributed log persistence.
 
-### 1.8 Known Limitations of Milestone 3
+### 1.8 Structured Event Tracing & Execution History
+Implemented in `src/titan/trace.py`:
+- **Canonical Event Model (`TraceEvent`)**:
+  - An immutable structured event capturing an authoritative logical state transition:
+    - `seq: int`: Strictly monotonically increasing sequence number assigned by the coordinator.
+    - `event_type: EventType`: Canonical enum category for the transition.
+    - `timestamp: float`: Monotonic observation time (`time.perf_counter()`).
+    - `job_id: str | None`: Logical job identifier when applicable.
+    - `attempt_id: int | None`: Concrete attempt identifier when applicable.
+    - `worker_id: str | None`: Worker entity identifier when applicable.
+    - `data: dict[str, Any]`: Structured contextual telemetry and failure metadata.
+- **Logical Execution Events vs Implementation Noise**:
+  - Titan traces meaningful lifecycle events, not arbitrary debug statements or internal loop counters:
+    - *Run Lifecycle*: `RUN_STARTED`, `RUN_COMPLETED`.
+    - *Worker Pool Lifecycle*: `WORKER_STARTED`, `WORKER_EXITED`, `WORKER_FAILED`, `WORKER_REPLACED`.
+    - *Job & Attempt Lifecycle*: `JOB_CREATED`, `JOB_ASSIGNED`, `JOB_STARTED`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_LOST`, `RETRY_SCHEDULED`, `JOB_REASSIGNED`.
+- **Event Ordering Semantics**:
+  - The canonical ordering of execution events is strictly defined by the coordinator's monotonic sequence number (`seq`).
+  - Wall-clock timestamps are purely informational telemetry and are **never** used as the source of ordering, preventing clock skew or timer jitter from corrupting execution history.
+- **Separation of Authoritative State vs Observational Trace**:
+  - The trace is an **observational collector** (`ExecutionTrace`).
+  - The runtime coordinator alone maintains authoritative state (`_job_states`, `_attempt_states`, `_attempt_ownership`, `_completed_jobs`).
+  - Runtime scheduling, retries, deduplication, and termination decisions never read, query, or depend on the trace collector.
+  - Normal execution proceeds identically whether a trace consumer is present, inspecting, or exporting the trace.
+- **Foundation for Future Replay & Failure Analysis**:
+  - The structured event trace preserves sufficient information to fully reconstruct:
+    - Complete job and attempt lifecycle trees.
+    - In-flight worker ownership at any point in logical time.
+    - Failure injection points, detection latency, and dead worker exit codes.
+    - Lost attempt recovery, retry instantiation, and reassignment to replacement workers.
+    - Terminal outcome metrics.
+  - This provides the auditable event log required by future milestones for deterministic execution replay, divergence detection, and failure analysis.
+
+### 1.9 Known Limitations of Milestone 4
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory. A crash of the coordinator process loses all state (persistent distributed logs are not yet implemented).
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
 - **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.

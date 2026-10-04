@@ -201,4 +201,32 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Perfect reproducibility across test runs; clear separation between experimental scenarios and runtime mechanics; rich observability payloads without polluting authoritative job domain models.
   - *Negative*: Scenarios are limited to deterministic single-node process crash-stop failures at this stage; networked partition scenarios remain for future milestones.
 
+---
+
+## ADR-014: Structured Execution Event Tracing
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: As Titan coordinates multi-process workloads, deterministic failure injection, retries, and capacity restoration, post-run analysis requires an auditable, reconstructable history of what physically happened during a run. Relying on raw logs, print statements, or ad-hoc metrics counters creates parsing fragility and fails to preserve the exact logical sequence of state transitions across jobs, execution attempts, and worker entities. Furthermore, the tracing layer must remain strictly observational and decoupled from runtime decision-making.
+- **Decision**:
+  1. Define a canonical logical event model (`TraceEvent` in `src/titan/trace.py`) with explicit schema fields:
+     - `seq: int`: Strictly monotonically increasing sequence number assigned by the coordinator.
+     - `event_type: EventType`: Explicit lifecycle transition enum member.
+     - `timestamp: float`: Monotonic observation timestamp.
+     - `job_id: str | None`: Logical job identifier when applicable.
+     - `attempt_id: int | None`: Concrete attempt identifier when applicable.
+     - `worker_id: str | None`: Worker entity identifier when applicable.
+     - `data: dict[str, Any]`: Structured details and telemetry payload.
+  2. Implement canonical lifecycle event types covering complete run, worker, and job lifecycles:
+     - Run: `RUN_STARTED`, `RUN_COMPLETED`
+     - Worker: `WORKER_STARTED`, `WORKER_EXITED`, `WORKER_FAILED`, `WORKER_REPLACED`
+     - Job/Attempt: `JOB_CREATED`, `JOB_ASSIGNED`, `JOB_STARTED`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_LOST`, `RETRY_SCHEDULED`, `JOB_REASSIGNED`
+  3. Enforce canonical ordering semantics via monotonic sequence numbers (`seq`), never wall-clock timestamps.
+  4. Maintain strict architectural separation between authoritative runtime state and the observational trace collector (`ExecutionTrace`). Runtime decisions (retries, deduplication, terminations) never read or depend on trace events.
+  5. Provide first-class JSON export and CLI inspection (`--trace` and `--trace-file <path>`), and include trace telemetry in `--json` payloads.
+- **Consequences**:
+  - *Positive*: Enables exact, deterministic reconstruction of execution history, failure points, and retry flows; clean separation of concerns; provides foundation for future replay and failure analysis milestones.
+  - *Negative*: Slight memory overhead for collecting event objects during large runs; addressed by lightweight dataclasses and optional collector resets.
+
+
 
