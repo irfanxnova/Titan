@@ -138,3 +138,136 @@ python src/titan/cli.py bench run TB-B-001 --json
 ```
 
 Artifacts are deterministically structured under `results/<scenario-id>/` containing `scenario.json`, `trace.json`, `replay.json`, `analysis.json`, and `result.json`.
+
+---
+
+## Recovery-Policy Experimentation Framework (Milestone 9)
+
+Beginning in Milestone 9, Titan provides an automated, fair, and reproducible framework (`src/titan/experiment/`) to evaluate and compare recovery policies on canonical TitanBench scenarios.
+
+### 1. Research Question
+> **How do different recovery policies affect recovery time, duplicate work, lost work, goodput, latency, and resource usage under controlled distributed failures?**
+
+### 2. Recovery Policy Model
+Policies are defined as immutable configurations with stable identifiers:
+
+| Policy ID | Name | Replace Workers | Max Retries | Description |
+|:---|:---|:---:|:---:|:---|
+| **R0** | `baseline-full-recovery` | True | 3 | Standard Titan baseline: automatic worker replacement and default retry budget. |
+| **R1** | `no-worker-replacement` | False | 3 | Failed workers are not replaced; surviving workers shoulder remaining workload. |
+| **R2** | `limited-retry` | True | 1 | Worker replacement enabled; retry budget minimized (zero retries allowed upon failure). |
+| **R3** | `minimal-recovery-disabled` | False | 1 | Minimal recovery: replacement disabled and retry budget minimized. |
+
+### 3. Fair Comparison Invariant
+When comparing policies on a benchmark scenario, **all non-policy variables are held strictly constant**:
+- Identical workload jobs count, work units, and distribution pattern.
+- Identical initial worker concurrency.
+- Identical random seed and deterministic execution sequence.
+- Identical failure injection timing, target worker ID, and threshold.
+- Identical measurement harness, trace capture, and replay validator.
+- Only policy-specific recovery parameters (`replace_failed_workers`, `max_retries`) vary.
+
+### 4. Rigorous Metric Definitions & Honesty Rule
+
+Every metric has an explicit mathematical formula, units, and scope:
+
+| Metric | Formula | Units | Scope | Limitations |
+|:---|:---|:---:|:---|:---|
+| **Recovery Rate** | $1.0$ if $\text{status} \in \{\text{CLEAN}, \text{RECOVERED}\} \land \text{failed} == 0$ else $0.0$ | ratio | Trial / Policy | Binary per-trial outcome; partial completion with failures counts as 0.0. |
+| **Useful Completions** | $\text{count}(\text{distinct completed jobs})$ | jobs | Workload | Ignores duplicate deliveries. |
+| **Total Attempts** | $\text{count}(\text{attempts dispatched})$ | attempts | Workload | Includes initial attempts and retries. |
+| **Retry Count** | $\text{count}(\text{EventType.RETRY\_SCHEDULED})$ | retries | Workload | Scheduled retry actions. |
+| **Duplicate Work** | $\max(0, \text{total\_attempts} - \text{useful\_completions})$ | executions | Workload | Physical attempt dispatches spent beyond unique jobs. |
+| **Lost Work** | $\text{count}(\text{EventType.JOB\_LOST})$ | attempts | Workload | In-flight attempts aborted mid-execution by worker crashes. |
+| **Worker Replacements**| $\text{count}(\text{EventType.WORKER\_REPLACED})$ | workers | Workload | Replacement processes spawned. |
+| **Recovery Duration** | $t_{\text{end}} - t_{\text{first\_failure}}$ if failure else $0.0$ | seconds | Failure interval | Includes execution of remaining jobs after requeue. |
+| **Goodput** | $\text{useful\_completions} / t_{\text{wall\_clock}}$ | jobs/s | Workload | Excludes redundant retries or failed attempts from numerator. |
+| **Average Latency** | $\text{mean}(t_{\text{complete}} - t_{\text{submit}}) \times 1000$ | ms | Completed jobs | End-to-end elapsed latency. |
+
+#### Intentionally Unavailable Metrics (Metric Honesty Rule)
+- **CPU Utilization (%)**: Not polled in-process to avoid runtime scheduling distortion.
+- **Worker Memory RSS**: Subprocess memory consumption is not continuously polled in the static runtime.
+- **Network I/O**: Inter-process communication uses OS pipes/queues, not network packets.
+- **Partial Job Progress Lost**: Titan jobs execute as atomic units; intra-job progress is uncommitted and discarded as a unit upon failure.
+- **Failure Detection Latency**: Exact OS process termination time is not recorded separately from coordinator queue poll detection.
+
+---
+
+### 5. Empirical Results: Required Milestone 9 Verification Matrix
+
+The 6 canonical experiments were executed through the Titan experiment runner:
+
+| Experiment | Scenario | Policy | Recovery Rate | Completed / Total | Retries | Replacements | Goodput (jobs/s) | Wall-Clock (s) |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Exp 1** | TB-B-001 | R0 | 100.0% | 10 / 10 | 1 | 1 | 70.17 | 0.1425 |
+| **Exp 2** | TB-B-001 | R1 | 100.0% | 10 / 10 | 0 | 0 | 118.29 | 0.0845 |
+| **Exp 3** | TB-C-001 | R0 | 100.0% | 8 / 8 | 1 | 1 | 63.11 | 0.1268 |
+| **Exp 4** | TB-C-001 | R1 | 100.0% | 8 / 8 | 1 | 0 | 80.41 | 0.0995 |
+| **Exp 5** | TB-E-001 | R0 | 100.0% | 6 / 6 | 1 | 1 | 55.13 | 0.1088 |
+| **Exp 6** | TB-E-001 | R2 | 0.0% | 5 / 6 | 0 | 1 | 42.50 | 0.1176 |
+
+---
+
+### 6. Side-by-Side Policy Comparisons
+
+#### Comparison A: In-Flight Failure under Baseline vs. Degraded Capacity (TB-C-001: R0 vs. R1)
+Command: `python src/titan/cli.py experiment compare TB-C-001 --policies R0,R1`
+
+| Metric | R0 (Baseline Recovery) | R1 (No Worker Replacement) |
+|:---|:---|:---|
+| **Recovery Rate (%)** | 100.0% | 100.0% |
+| **Completed Jobs** | 8.0 | 8.0 |
+| **Failed Jobs** | 0.0 | 0.0 |
+| **Total Attempts** | 9.0 | 9.0 |
+| **Retries** | 1.0 | 1.0 |
+| **Duplicate Work** | 1.0 | 1.0 |
+| **Lost Work** | 1.0 | 1.0 |
+| **Worker Replacements** | 1.0 | 0.0 |
+| **Recovery Duration** | 0.0121 s | 0.0005 s |
+| **Goodput** | 68.53 jobs/s | 84.18 jobs/s |
+| **Wall-Clock Time** | 0.1167 s | 0.0950 s |
+
+**Observed Empirical Findings**:
+- Both policies achieved 100% recovery of the interrupted in-flight job.
+- Policy R0 spawned a replacement worker (1 replacement), incurring subprocess creation overhead.
+- Policy R1 did not spawn a replacement (0 replacements); the surviving worker processed the retried job and remaining workload. For small workloads, avoiding subprocess respawn overhead yielded lower wall-clock duration.
+
+#### Comparison B: Retry Budget Impact on Retry Pressure (TB-E-001: R0 vs. R2)
+Command: `python src/titan/cli.py experiment compare TB-E-001 --policies R0,R2`
+
+| Metric | R0 (Baseline Recovery) | R2 (Limited Retry Budget) |
+|:---|:---|:---|
+| **Recovery Rate (%)** | 100.0% | 0.0% |
+| **Completed Jobs** | 6.0 | 5.0 |
+| **Failed Jobs** | 0.0 | 1.0 |
+| **Total Attempts** | 7.0 | 6.0 |
+| **Retries** | 1.0 | 0.0 |
+| **Duplicate Work** | 1.0 | 1.0 |
+| **Lost Work** | 1.0 | 1.0 |
+| **Worker Replacements** | 1.0 | 1.0 |
+| **Recovery Duration** | 0.0105 s | 0.0629 s |
+| **Goodput** | 54.79 jobs/s | 38.21 jobs/s |
+| **Wall-Clock Time** | 0.1095 s | 0.1309 s |
+
+**Observed Empirical Findings**:
+- Policy R0 granted retry budget (`max_retries=3`), successfully retrying the aborted attempt and achieving 100% recovery.
+- Policy R2 enforced `max_retries=1`, exhausting retries immediately upon the single worker crash. The in-flight job permanently failed, yielding 0% recovery rate and reduced goodput.
+
+---
+
+### 7. CLI Usage
+
+```bash
+# List all registered recovery policies
+python src/titan/cli.py experiment list-policies [--json]
+
+# Run a specific scenario under a recovery policy
+python src/titan/cli.py experiment run TB-B-001 R0 [--trials N] [--json]
+
+# Compare multiple recovery policies side-by-side
+python src/titan/cli.py experiment compare TB-B-001 --policies R0,R1 [--trials N] [--json]
+
+# Run an experiment defined in a JSON config file
+python src/titan/cli.py experiment run-config experiments/configs/exp-001.json
+```
+

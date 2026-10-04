@@ -337,6 +337,35 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Establishes Titan's first reproducible failure corpus; unifies execution, trace capture, replay, and root-cause analysis in a single automated runner; distinguishes expected failure behavior from framework errors; creates a rock-solid foundation for future recovery-policy experiments and ablation studies.
   - *Negative*: Scenarios must be run in sequence or with isolated process pools to prevent port/queue interference on single-node environments.
 
+---
+
+## ADR-019: Recovery-Policy Experimentation Framework
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Milestone 8 established TitanBench with 9 canonical failure scenarios. However, answering Titan's core research question—*"How do different recovery policies affect recovery time, duplicate work, lost work, goodput, latency, and resource usage under controlled distributed failures?"*—requires an explicit, fair, and reproducible experimentation framework. The framework must evaluate recovery policies independently from scenario definitions, maintain strictly controlled non-policy variables, enforce the Metric Honesty Rule against fabricated metrics, support repeated trials, aggregate statistical summaries, and generate side-by-side policy comparisons.
+- **Decision**:
+  1. Build a dedicated recovery-policy experimentation framework (`src/titan/experiment/`) decoupled from the core runtime and benchmark corpus.
+  2. Define an explicit, immutable recovery policy model (`RecoveryPolicy` in `policy.py`) with stable identifiers:
+     - `R0` (Baseline Recovery): Automatic worker replacement enabled (`replace_failed_workers=True`), default retry budget (`max_retries=3`).
+     - `R1` (No Worker Replacement): Worker replacement disabled (`replace_failed_workers=False`), default retry budget (`max_retries=3`).
+     - `R2` (Limited Retry Budget): Worker replacement enabled (`replace_failed_workers=True`), minimized retry budget (`max_retries=1`).
+     - `R3` (Minimal Recovery): Both worker replacement and retries minimized (`replace_failed_workers=False`, `max_retries=1`).
+  3. Enforce the Fair Comparison Invariant: `policy.apply_to_scenario(scenario)` derives a new `Scenario` preserving 100% of non-policy workload variables (jobs, workers, work units, distribution patterns, seed, fault configurations, duplicate jobs, timeout), varying strictly the recovery parameters.
+  4. Enforce the Metric Honesty Rule (`metrics.py`):
+     - Extract strictly measurable metrics: `recovery_rate`, `unrecovered_failure_rate`, `useful_completions`, `total_attempts`, `retry_count`, `duplicate_work`, `retry_overhead`, `lost_work`, `worker_failures`, `worker_replacements`, `wall_clock_duration_sec`, `recovery_duration_sec`, `goodput_jobs_per_sec`, and end-to-end latency percentiles (`avg_latency_ms`, `p50_latency_ms`, `p95_latency_ms`, `p99_latency_ms`).
+     - Explicitly catalog unavailable metrics (`cpu_utilization_pct`, `memory_rss_bytes`, `network_io_bytes`, `intra_job_partial_work_lost`, `failure_detection_latency`) with technical rationales rather than fabricating proxy values.
+  5. Implement multi-trial repetition and aggregation models (`trial.py`):
+     - `ExperimentTrial`: Captures single trial outcomes, trace references, and execution telemetry.
+     - `ExperimentResult`: Aggregates $N$ trials with sample counts, means, min, max, and recovery rates.
+     - `PolicyComparison`: Renders side-by-side comparison tables (`| Metric | R0 | R1 | ... |`) and factual, evidence-based observed differences without speculative winner declarations.
+  6. Standardize machine-readable JSON artifact hierarchy under `experiments/results/<experiment-id>/` (`experiment.json`, `summary.json`, `trials/trial-NNN.json`, `trials/trace-NNN.json`), ignored by Git via `.gitignore`.
+  7. Extend the CLI with the `experiment` subcommand (`list-policies`, `run <scenario> <policy>`, `compare <scenario> --policies ...`, `run-config <file>`).
+- **Consequences**:
+  - *Positive*: Provides a fair, rigorous, and automated harness for comparative recovery-policy research; captures empirical trade-offs (e.g. capacity degradation in R1 vs. full recovery in R0; retry exhaustion in R2 vs. recovery in R0); ensures reproducible data collection for future ablation and statistical evaluation milestones.
+  - *Negative*: Multi-trial experiments require cumulative runtime proportional to repetition count and workload size.
+
+
 
 
 

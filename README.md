@@ -14,11 +14,23 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 8: TitanBench Failure Corpus & Scenario Runner)
+## Current Status (Milestone 9: Recovery-Policy Experimentation Framework)
 
-Titan has implemented **TitanBench: A Versioned, Reproducible Failure Corpus and Scenario Runner**, building atop its authoritative failure-aware runtime, deterministic scenario definitions, structured event tracing, deterministic replay, fidelity divergence detection, and root-cause failure analysis.
+Titan has implemented the **Recovery-Policy Experimentation Framework**, building atop its authoritative failure-aware runtime, deterministic scenario definitions, structured event tracing, deterministic replay, fidelity divergence detection, root-cause failure analysis, and the TitanBench canonical failure corpus.
 
 ### What Currently Exists
+- **Recovery-Policy Experimentation Framework (`src/titan/experiment/`)**:
+  - Explicit, immutable recovery policy model with stable identifiers:
+    - `R0` (`baseline-full-recovery`): Automatic worker replacement enabled (`replace_failed_workers=True`), default retry budget (`max_retries=3`).
+    - `R1` (`no-worker-replacement`): Worker replacement disabled (`replace_failed_workers=False`), surviving workers process retried work under degraded capacity.
+    - `R2` (`limited-retry`): Worker replacement enabled (`replace_failed_workers=True`), retry budget minimized (`max_retries=1`, fail-fast on failure).
+    - `R3` (`minimal-recovery-disabled`): Both replacement and retries minimized (`replace_failed_workers=False`, `max_retries=1`).
+  - Fair Comparison Invariant: derived scenarios hold all non-policy variables (workload, workers, jobs, work units, seed, fault injection) strictly constant.
+  - Rigorous Metric Extraction enforcing the Metric Honesty Rule: measures recovery rate, useful completions, total attempts, retries, duplicate work, lost work, worker replacements, recovery duration, goodput, and latency percentiles without fabricating unavailable hardware metrics.
+  - Multi-trial repetition and statistical aggregation (`ExperimentResult`) computing sample counts, means, min, max, and recovery rates.
+  - Side-by-side policy comparisons (`PolicyComparison`) generating clear tabular outputs and evidence-based observed differences.
+  - Standardized JSON artifacts under `experiments/results/<experiment-id>/` (`experiment.json`, `summary.json`, `trials/trial-NNN.json`).
+  - First-class CLI interface via `python src/titan/cli.py experiment` (`list-policies`, `run`, `compare`, `run-config`).
 - **TitanBench Failure Corpus & Scenario Runner (`src/titan/bench/`)**:
   - Systematic, versioned failure corpus containing 9 canonical scenario classes (A through I) with stable identifiers (`TB-A-001` through `TB-I-001`).
   - Automated benchmark pipeline: Scenario Definition -> Titan Execution -> Trace Artifact -> Trace Replay -> Root-Cause Failure Analysis -> Oracle Evaluation -> Machine-Readable Result Artifacts.

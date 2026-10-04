@@ -317,13 +317,59 @@ Implemented in `src/titan/bench/`:
     - `trace.json`: Canonical structured execution trace event array.
     - `replay.json`: Deterministic trace replay and validation report.
     - `analysis.json`: Root-cause failure analysis report with causal chains.
-    - `result.json`: Authoritative JSON benchmark result with pass/fail status, telemetry, and paths.
+### 1.13 Recovery-Policy Experimentation Framework
+Implemented in `src/titan/experiment/`:
+- **Conceptual Pipeline**:
+  ```
+  TitanBench Scenario + Recovery Policy
+                  ↓
+              Titan Run
+                  ↓
+                Trace
+                  ↓
+           Replay + Analysis
+                  ↓
+           Metric Extraction
+                  ↓
+           Experiment Result
+                  ↓
+           Policy Comparison
+  ```
+- **Explicit Recovery Policy Model (`RecoveryPolicy`, `PolicyRegistry`)**:
+  - Encapsulates recovery behaviors independently from workload scenarios.
+  - Frozen, immutable dataclass configuration with stable string identifiers:
+    - `R0` (Baseline Recovery): Standard automatic worker replacement (`replace_failed_workers=True`) and default retry budget (`max_retries=3`).
+    - `R1` (No Worker Replacement): Failed workers are not replaced (`replace_failed_workers=False`); surviving workers process retried work under degraded pool capacity.
+    - `R2` (Limited Retry Budget): Worker replacement is enabled (`replace_failed_workers=True`), but retry budget is minimized (`max_retries=1`, allowing zero retries upon failure).
+    - `R3` (Minimal Recovery): Both worker replacement and retries are disabled/minimized (`replace_failed_workers=False`, `max_retries=1`).
+- **Fair Comparison Invariant**:
+  - `policy.apply_to_scenario(benchmark_scenario.scenario)` derives a new `Scenario` preserving 100% of non-policy workload variables: `num_workers`, `num_jobs`, `work_units`, `pattern`, `seed`, `fault_config`, `fault_configs`, `duplicate_jobs`, and `timeout`.
+  - Only recovery-policy parameters (`replace_failed_workers`, `max_retries`) are overridden.
+- **Metric Extraction & The Metric Honesty Rule (`ExperimentMetrics`)**:
+  - Reports strictly empirical, non-fabricated metrics:
+    - *Reliability*: `recovery_rate` (1.0 if CLEAN/RECOVERED with 0 failed jobs, else 0.0), `unrecovered_failure_rate`, `invariant_violations`.
+    - *Work*: `total_jobs`, `completed_jobs`, `failed_jobs`, `total_attempts`, `retries`, `duplicate_work` ($\max(0, \text{attempts} - \text{completed})$), `lost_work` (aborted in-flight attempts), `retry_overhead`, `duplicate_completions_ignored`.
+    - *Recovery*: `worker_failures`, `worker_replacements`, `recovery_classification`, `recovery_duration_sec`.
+    - *Performance*: `wall_clock_duration_sec`, `goodput_jobs_per_sec` ($\text{completed\_jobs} / \text{wall\_clock}$).
+    - *Latency*: `avg_latency_ms`, `p50_latency_ms`, `p95_latency_ms`, `p99_latency_ms`.
+  - Intentionally unavailable metrics (`cpu_utilization_pct`, `memory_rss_bytes`, `network_io_bytes`, `intra_job_partial_work_lost`, `failure_detection_latency`) are cataloged with explicit technical rationales rather than fabricating proxy numbers.
+- **Multi-Trial Repetition and Aggregation (`ExperimentResult`, `PolicyComparison`)**:
+  - Supports $N$ repeated trials to observe variance under identical deterministic inputs.
+  - Computes sample counts, mean, min, and max for all numeric telemetry.
+  - Side-by-side policy comparisons generate ASCII tables and evidence-based factual observations without premature winner declarations.
+- **Machine-Readable Artifact Layout**:
+  - Standardized under `experiments/results/<experiment-id>/`:
+    - `experiment.json`: Metadata, base scenario specification, and effective scenario configuration.
+    - `summary.json`: Aggregated trial statistics and recovery rate.
+    - `trials/trial-NNN.json`: Structured trial telemetry.
+    - `trials/trace-NNN.json`: Canonical execution trace.
+    - `comparisons/<scenario-id>/comparison.json`: Multi-policy side-by-side comparative evaluation.
 
-### 1.13 Known Limitations of Milestone 8
+### 1.14 Known Limitations of Milestone 9
 - **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state.
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
-- **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; dynamic autoscaling and adaptive recovery policies are deferred to subsequent milestones.
-- **Single-Node Benchmark Execution**: Benchmarks run sequentially or in local isolated process pools without cross-node network orchestration.
+- **Basic Summary Statistics**: The framework computes mean, min, and max across repeated trials. Complex statistical inference (confidence intervals, ANOVA, hypothesis testing) is intentionally deferred to the evaluation milestone.
+- **No Learned Recovery**: Policies are static configurations; dynamic or machine-learning-based recovery selection is out of scope.
 
 ---
 

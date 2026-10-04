@@ -256,37 +256,154 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output benchmark summary formatted as JSON.",
     )
 
+    # 'experiment' subcommand
+    exp_parser = subparsers.add_parser(
+        "experiment",
+        help="Recovery-policy experimentation and comparison framework.",
+    )
+    exp_subparsers = exp_parser.add_subparsers(
+        dest="experiment_command",
+        help="Available experiment subcommands",
+    )
+
+    # experiment list-policies
+    exp_list_parser = exp_subparsers.add_parser(
+        "list-policies",
+        help="List all registered recovery policies.",
+    )
+    exp_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output recovery policy list formatted as JSON.",
+    )
+
+    # experiment run
+    exp_run_parser = exp_subparsers.add_parser(
+        "run",
+        help="Execute an experiment running a scenario under a specific recovery policy.",
+    )
+    exp_run_parser.add_argument(
+        "scenario_id",
+        type=str,
+        help="Stable scenario ID to evaluate (e.g. 'TB-B-001').",
+    )
+    exp_run_parser.add_argument(
+        "policy_id",
+        type=str,
+        help="Stable recovery policy ID (e.g. 'R0', 'R1', 'R2', 'R3').",
+    )
+    exp_run_parser.add_argument(
+        "--trials",
+        type=int,
+        default=1,
+        help="Number of repeated trials to execute. Default: 1.",
+    )
+    exp_run_parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=str,
+        default=None,
+        help="Optional custom output directory for experiment artifacts.",
+    )
+    exp_run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output experiment result formatted as JSON.",
+    )
+
+    # experiment compare
+    exp_compare_parser = exp_subparsers.add_parser(
+        "compare",
+        help="Compare multiple recovery policies on the same scenario.",
+    )
+    exp_compare_parser.add_argument(
+        "scenario_id",
+        type=str,
+        help="Stable scenario ID to evaluate (e.g. 'TB-B-001').",
+    )
+    exp_compare_parser.add_argument(
+        "--policies",
+        type=str,
+        required=True,
+        help="Comma-separated recovery policy IDs to compare (e.g. 'R0,R1' or 'R0,R1,R2').",
+    )
+    exp_compare_parser.add_argument(
+        "--trials",
+        type=int,
+        default=1,
+        help="Number of repeated trials per policy. Default: 1.",
+    )
+    exp_compare_parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=str,
+        default=None,
+        help="Optional custom output directory for comparison artifacts.",
+    )
+    exp_compare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output policy comparison formatted as JSON.",
+    )
+
+    # experiment run-config
+    exp_config_parser = exp_subparsers.add_parser(
+        "run-config",
+        help="Execute an experiment defined by a JSON configuration file.",
+    )
+    exp_config_parser.add_argument(
+        "config_file",
+        type=str,
+        help="Path to JSON configuration file.",
+    )
+    exp_config_parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=str,
+        default=None,
+        help="Optional custom output directory for experiment artifacts.",
+    )
+    exp_config_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results formatted as JSON.",
+    )
+
     return parser
 
 
 def handle_status(json_output: bool = False) -> int:
     """Print the current system status and active configuration."""
     from titan.bench import CorpusRegistry
+    from titan.experiment import PolicyRegistry
 
     config = TitanConfig.from_env()
     bench_scenarios = [s.scenario_id for s in CorpusRegistry.list_all()]
+    policies = [p.policy_id for p in PolicyRegistry.list_all()]
 
     if json_output:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 8: TitanBench Failure Corpus & Scenario Runner",
+            "milestone": "Milestone 9: Recovery-Policy Experimentation Framework",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
             "scenarios": list(PREDEFINED_SCENARIOS.keys()),
             "benchmark_corpus": bench_scenarios,
+            "recovery_policies": policies,
         }
         print(json.dumps(data, indent=2))
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   8 (TitanBench Failure Corpus & Runner)")
+        print("  Milestone:   9 (Recovery-Policy Framework; Milestone:   8 (TitanBench Failure Corpus & Runner))")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (TitanBench Active)")
+        print("  State:       Operational (TitanBench Active, Recovery Policies Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
         print(f"  TitanBench:  {len(bench_scenarios)} canonical scenarios ({', '.join(bench_scenarios)})")
+        print(f"  Policies:    {', '.join(policies)}")
 
     return 0
 
@@ -764,6 +881,196 @@ def handle_bench_run_all(
     return 0 if summary.all_passed else 1
 
 
+def handle_experiment_list_policies(json_output: bool = False) -> int:
+    """List all registered recovery policies."""
+    from titan.experiment import PolicyRegistry
+
+    policies = PolicyRegistry.list_all()
+    if json_output:
+        print(json.dumps([p.to_dict() for p in policies], indent=2))
+        return 0
+
+    print("=" * 80)
+    print("Titan Recovery Policies")
+    print("=" * 80)
+    for p in policies:
+        print(f"  [{p.policy_id:<4}] {p.name:<28} Replace: {str(p.replace_failed_workers):<5} | Max Retries: {p.max_retries}")
+        print(f"         {p.description}")
+    print("=" * 80)
+    return 0
+
+
+def handle_experiment_run(
+    scenario_id: str,
+    policy_id: str,
+    trials: int = 1,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute an experiment evaluating a scenario under a recovery policy."""
+    from titan.bench import CorpusRegistry
+    from titan.experiment import ExperimentRunner, PolicyRegistry
+
+    try:
+        CorpusRegistry.get(scenario_id)
+    except KeyError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        PolicyRegistry.get(policy_id)
+    except KeyError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    runner = ExperimentRunner(output_base_dir=output_dir or "experiments/results")
+    result = runner.run_experiment(
+        scenario_id=scenario_id,
+        policy_id=policy_id,
+        repetitions=trials,
+        output_dir=output_dir,
+    )
+
+    if json_output:
+        print(result.to_json())
+        return 0 if result.recovery_rate > 0.0 else 1
+
+    print("=" * 70)
+    print("Titan Recovery-Policy Experiment Result")
+    print("=" * 70)
+    print(f"  Experiment ID:           {result.experiment_id}")
+    print(f"  Scenario:                {result.scenario_id} ({result.scenario_class})")
+    print(f"  Policy:                  {result.policy_id} ({result.policy_config.get('name', '')})")
+    print(f"  Repetitions:             {result.repetitions}")
+    print(f"  Successful Trials:       {result.successful_trials}/{result.repetitions} ({result.recovery_rate * 100.0:.1f}%)")
+
+    comp_m = result.metric_summaries.get("completed_jobs")
+    fail_m = result.metric_summaries.get("failed_jobs")
+    att_m = result.metric_summaries.get("total_attempts")
+    ret_m = result.metric_summaries.get("retries")
+    rep_m = result.metric_summaries.get("worker_replacements")
+    dur_m = result.metric_summaries.get("wall_clock_duration_sec")
+    rec_dur_m = result.metric_summaries.get("recovery_duration_sec")
+    goodput_m = result.metric_summaries.get("goodput_jobs_per_sec")
+
+    if comp_m:
+        print(f"  Completed Jobs (mean):   {comp_m.mean:.1f}")
+    if fail_m:
+        print(f"  Failed Jobs (mean):      {fail_m.mean:.1f}")
+    if att_m:
+        print(f"  Total Attempts (mean):   {att_m.mean:.1f}")
+    if ret_m:
+        print(f"  Retries (mean):          {ret_m.mean:.1f}")
+    if rep_m:
+        print(f"  Replacements (mean):     {rep_m.mean:.1f}")
+    if rec_dur_m:
+        print(f"  Recovery Duration:       {rec_dur_m.mean:.4f} s")
+    if dur_m:
+        print(f"  Wall-Clock Duration:     {dur_m.mean:.4f} s")
+    if goodput_m:
+        print(f"  Goodput:                 {goodput_m.mean:.2f} jobs/s")
+    print("=" * 70)
+    return 0 if result.recovery_rate > 0.0 else 1
+
+
+def handle_experiment_compare(
+    scenario_id: str,
+    policies_str: str,
+    trials: int = 1,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Compare multiple recovery policies on the same scenario."""
+    from titan.bench import CorpusRegistry
+    from titan.experiment import ExperimentRunner, PolicyRegistry
+
+    try:
+        CorpusRegistry.get(scenario_id)
+    except KeyError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    policies = [p.strip() for p in policies_str.split(",") if p.strip()]
+    if not policies:
+        print("Error: Specify at least one policy ID to compare.", file=sys.stderr)
+        return 1
+
+    for pid in policies:
+        try:
+            PolicyRegistry.get(pid)
+        except KeyError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+    runner = ExperimentRunner(output_base_dir=output_dir or "experiments/results")
+    comparison = runner.compare_policies(
+        scenario_id=scenario_id,
+        policy_ids=policies,
+        repetitions=trials,
+        output_dir=output_dir,
+    )
+
+    if json_output:
+        print(comparison.to_json())
+        return 0
+
+    print("=" * 80)
+    print(f"Titan Recovery Policy Comparison: {comparison.scenario_id} ({comparison.scenario_class})")
+    print(f"Evaluated with {trials} trial(s) per policy. Non-policy variables strictly controlled.")
+    print("=" * 80)
+    print(comparison.to_table())
+    print("=" * 80)
+    print("Observed Differences:")
+    for obs in comparison.observed_differences:
+        print(f"  - {obs}")
+    print("=" * 80)
+    return 0
+
+
+def handle_experiment_run_config(
+    config_file: str,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute an experiment defined by a JSON configuration file."""
+    from titan.experiment import ExperimentResult, ExperimentRunner, PolicyComparison
+
+    runner = ExperimentRunner(output_base_dir=output_dir or "experiments/results")
+    try:
+        res = runner.run_config(config_file, output_dir=output_dir)
+    except Exception as exc:
+        print(f"Error executing config: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(res.to_json())
+        return 0
+
+    if isinstance(res, PolicyComparison):
+        print("=" * 80)
+        print(f"Titan Recovery Policy Comparison: {res.scenario_id} ({res.scenario_class})")
+        print("=" * 80)
+        print(res.to_table())
+        print("=" * 80)
+        print("Observed Differences:")
+        for obs in res.observed_differences:
+            print(f"  - {obs}")
+        print("=" * 80)
+        return 0
+    elif isinstance(res, ExperimentResult):
+        print("=" * 70)
+        print(f"Titan Recovery-Policy Experiment Result: {res.experiment_id}")
+        print("=" * 70)
+        print(f"  Scenario:          {res.scenario_id}")
+        print(f"  Policy:            {res.policy_id}")
+        print(f"  Recovery Rate:     {res.recovery_rate * 100.0:.1f}%")
+        print(f"  Successful Trials: {res.successful_trials}/{res.repetitions}")
+        print("=" * 70)
+        return 0 if res.recovery_rate > 0.0 else 1
+
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -823,6 +1130,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             print("Error: Specify a bench subcommand (list, run, run-all). See 'titan bench --help'.", file=sys.stderr)
+            return 1
+
+    if args.command == "experiment":
+        if args.experiment_command == "list-policies":
+            return handle_experiment_list_policies(json_output=args.json)
+        elif args.experiment_command == "run":
+            return handle_experiment_run(
+                scenario_id=args.scenario_id,
+                policy_id=args.policy_id,
+                trials=args.trials,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.experiment_command == "compare":
+            return handle_experiment_compare(
+                scenario_id=args.scenario_id,
+                policies_str=args.policies,
+                trials=args.trials,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.experiment_command == "run-config":
+            return handle_experiment_run_config(
+                config_file=args.config_file,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        else:
+            print("Error: Specify an experiment subcommand (list-policies, run, compare, run-config). See 'titan experiment --help'.", file=sys.stderr)
             return 1
 
     parser.print_help()

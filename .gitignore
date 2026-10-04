@@ -36,6 +36,9 @@ htmlcov/
 # TitanBench generated artifacts
 results/
 
+# Recovery policy experiment artifacts
+experiments/results/
+
 # IDE and OS files
 .vscode/
 .idea/
