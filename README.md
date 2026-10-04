@@ -14,11 +14,18 @@ Titan answers this question through empirical measurement, reproducible trial ru
 
 ---
 
-## Current Status (Milestone 7: Failure Classification & Root-Cause Analysis)
+## Current Status (Milestone 8: TitanBench Failure Corpus & Scenario Runner)
 
-Titan has implemented its **Failure-Aware Multi-Process Runtime with Structured Event Tracing, Deterministic Replay Engine, Replay Fidelity / Divergence Detection, and Deterministic Failure Classification & Root-Cause Analysis**, featuring in-flight ownership tracking, deterministic failure injection, at-least-once processing semantics, coordinator deduplication, capacity-restoring worker replacement, canonical execution event tracing, observational trace replay, automated fidelity divergence detection, and deterministic evidence-based root-cause failure analysis.
+Titan has implemented **TitanBench: A Versioned, Reproducible Failure Corpus and Scenario Runner**, building atop its authoritative failure-aware runtime, deterministic scenario definitions, structured event tracing, deterministic replay, fidelity divergence detection, and root-cause failure analysis.
 
 ### What Currently Exists
+- **TitanBench Failure Corpus & Scenario Runner (`src/titan/bench/`)**:
+  - Systematic, versioned failure corpus containing 9 canonical scenario classes (A through I) with stable identifiers (`TB-A-001` through `TB-I-001`).
+  - Automated benchmark pipeline: Scenario Definition -> Titan Execution -> Trace Artifact -> Trace Replay -> Root-Cause Failure Analysis -> Oracle Evaluation -> Machine-Readable Result Artifacts.
+  - Deterministic oracles (`ExpectedBehavior`): Evaluates execution, replay validity, root-cause classifications, and failure recoveries against explicit assertions.
+  - Distinguishes expected failure behavior (e.g. unrecovered retry exhaustion) from framework errors.
+  - Standardized JSON result artifacts (`scenario.json`, `trace.json`, `replay.json`, `analysis.json`, `result.json`) persisted under `results/<scenario-id>/`.
+  - Dedicated CLI commands: `titan bench list`, `titan bench run <id> [--json]`, and `titan bench run-all [--json]`.
 - **Deterministic Failure Classification & Root-Cause Analysis (`src/titan/analysis.py`)**:
   - Deterministic rule-based analysis consuming canonical traces, replay state, and divergence results without mutating them.
   - Answers what failed, where, which logical entity was affected, immediate failure mode, recovery action, and recovery outcome.
@@ -179,19 +186,40 @@ Perform failure analysis with expected trace divergence detection:
 python src/titan/cli.py analyze trace.json --expected expected_trace.json
 ```
 
+### Running TitanBench Scenarios
+List all canonical failure scenarios registered in the TitanBench corpus:
+```powershell
+python src/titan/cli.py bench list
+```
+
+Run an individual benchmark scenario by stable ID:
+```powershell
+python src/titan/cli.py bench run TB-B-001
+```
+
+Run an individual benchmark scenario and export structured result as JSON:
+```powershell
+python src/titan/cli.py bench run TB-B-001 --json
+```
+
+Execute the full canonical TitanBench failure corpus (Classes A through I) with automated oracle verification:
+```powershell
+python src/titan/cli.py bench run-all
+```
+
 ### Running Custom Workloads & Fault Injection
 Execute a custom workload with deterministic failure injection:
 ```powershell
 python src/titan/cli.py run --workers 4 --jobs 100 --work-units 2000 --kill-worker 2 --kill-after-jobs 5
 ```
 
-Check platform status and available scenario presets:
+Check platform status, milestone version, and available scenario presets:
 ```powershell
 python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 116-test automated suite using Python's built-in standard library runner (zero external dependencies required):
+Run the 141-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```

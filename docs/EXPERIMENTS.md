@@ -100,3 +100,41 @@ Trial A: Normal static multi-process runtime execution with 4 workers and 0 inje
 2. **Terminal Accounting Verified**: $\text{completed\_unique} (100) + \text{failed\_unique} (0) == \text{submitted} (100)$. Exactly 101 execution attempts were executed, reflecting the single recovered job attempt.
 3. **No Double-Counting**: Every unique job ID received exactly one final successful result.
 4. **Latency Impact**: The failure recovery cycle introduced a ~28 ms shift in p50 latency and a 16.5 ms recovery interval, reflecting worker replacement initialization and job re-execution.
+
+---
+
+## TitanBench: Canonical Failure Corpus for Future Experiments
+
+Beginning in Milestone 8, **TitanBench** (`src/titan/bench/`) serves as Titan's authoritative failure corpus and experimental harness. All future recovery-policy comparisons, ablation studies, and fault evaluations will draw directly from the standardized TitanBench scenario specifications and runner.
+
+### Canonical Scenarios Overview
+
+| Scenario ID | Class | Description | Workers | Jobs | Faults | Expected Outcome |
+|:---|:---|:---|:---:|:---:|:---|:---|
+| **TB-A-001** | `CLASS_A_BASELINE` | Clean deterministic baseline | 2 | 10 | None | CLEAN (0 failures, 10 completed) |
+| **TB-B-001** | `CLASS_B_SINGLE_WORKER_FAILURE` | Single worker failure and replacement | 2 | 10 | Worker 0 killed after 2 jobs | RECOVERED (1 root failure, 10 completed) |
+| **TB-C-001** | `CLASS_C_IN_FLIGHT_FAILURE` | In-flight execution interruption | 2 | 8 | Worker 0 killed after 1 job | RECOVERED (1 root failure, 8 completed) |
+| **TB-D-001** | `CLASS_D_REPEATED_FAILURE` | Sequential failures across workers | 3 | 15 | Worker 0 (2 jobs), Worker 1 (4 jobs) | RECOVERED (2 root failures, 15 completed) |
+| **TB-E-001** | `CLASS_E_RETRY_PRESSURE` | Retry exhaustion under max_retries=1 | 2 | 6 | Worker 0 killed after 1 job | UNRECOVERED (1 root failure, 1 failed job) |
+| **TB-F-001** | `CLASS_F_DUPLICATE_STALE` | Duplicate completion result suppression | 2 | 10 | 2 duplicate completions injected | CLEAN (2 duplicates ignored, 10 completed) |
+| **TB-G-001** | `CLASS_G_CAPACITY_LOSS` | Worker loss without replacement | 2 | 10 | Worker 0 killed (no replacement) | RECOVERED (1 root failure, 0 replacements) |
+| **TB-H-001** | `CLASS_H_ADVERSARIAL_TIMING` | Lifecycle boundary fault on acquisition | 2 | 8 | Worker 0 killed at kill_after_jobs=0 | RECOVERED (1 root failure, 8 completed) |
+| **TB-I-001** | `CLASS_I_LARGE_WORKLOAD` | Scaled worker concurrency and workload | 4 | 40 | None | CLEAN (0 failures, 40 completed) |
+
+### Executing the Corpus
+
+```bash
+# List all registered canonical scenarios
+python src/titan/cli.py bench list
+
+# Run a specific benchmark scenario
+python src/titan/cli.py bench run TB-B-001
+
+# Run the complete failure corpus with automated oracle evaluation
+python src/titan/cli.py bench run-all
+
+# Output machine-readable JSON results
+python src/titan/cli.py bench run TB-B-001 --json
+```
+
+Artifacts are deterministically structured under `results/<scenario-id>/` containing `scenario.json`, `trace.json`, `replay.json`, `analysis.json`, and `result.json`.

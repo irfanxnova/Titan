@@ -359,7 +359,7 @@ class TestFailureAnalysis(unittest.TestCase):
         """11. CLI analyze command displays human-readable report."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             trace_path = Path(tmp_dir) / "test_trace.json"
-            main(["run", "--scenario", "worker-crash", "--jobs", "8", "--work-units", "100", "--trace-file", str(trace_path)])
+            main(["run", "--scenario", "worker-crash", "--jobs", "20", "--work-units", "100", "--trace-file", str(trace_path)])
 
             stdout_capture = io.StringIO()
             with patch("sys.stdout", stdout_capture):
@@ -379,7 +379,7 @@ class TestFailureAnalysis(unittest.TestCase):
         """12. CLI analyze --json outputs structured JSON report."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             trace_path = Path(tmp_dir) / "test_trace.json"
-            main(["run", "--scenario", "worker-crash", "--jobs", "8", "--work-units", "100", "--trace-file", str(trace_path)])
+            main(["run", "--scenario", "worker-crash", "--jobs", "20", "--work-units", "100", "--trace-file", str(trace_path)])
 
             stdout_capture = io.StringIO()
             with patch("sys.stdout", stdout_capture):

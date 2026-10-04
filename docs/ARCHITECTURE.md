@@ -272,11 +272,58 @@ Implemented in `src/titan/analysis.py`:
   - Structurally invalid traces are rejected upfront via existing `ReplayEngine.replay()` validation results rather than attempting unsupported analysis.
   - Replay divergence comparison results from `ReplayFidelityEngine.compare()` are cleanly integrated as `REPLAY_DIVERGENCE` records with `NOT_APPLICABLE` recovery status.
 
-### 1.12 Known Limitations of Milestone 7
-- **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state (persistent distributed logs are not yet implemented).
+### 1.12 TitanBench: Reproducible Failure Corpus & Scenario Runner
+Implemented in `src/titan/bench/`:
+- **Purpose and Architecture**:
+  - TitanBench is a versioned, deterministic failure-corpus and scenario runner layered on top of Titan's scenario, trace, replay, and analysis subsystems.
+  - Conceptual pipeline:
+    ```
+    Benchmark Scenario (Corpus)
+               │
+               ▼
+       TitanBench Runner
+               │
+               ▼
+        Titan Execution ──> Trace Artifact (trace.json)
+                                   │
+                                   ├─> Replay Engine (replay.json)
+                                   │
+                                   └─> Failure Analysis (analysis.json)
+                                               │
+                                               ▼
+                                      Oracle Evaluation
+                                               │
+                                               ▼
+                                       Benchmark Result
+                             (PASS / FAIL / INVALID + result.json)
+    ```
+  - The benchmark layer remains completely separate from Titan's core runtime logic and is independently usable via a small, clean Python API or the CLI.
+- **Canonical Scenario Classes (A through I)**:
+  - `CLASS_A_BASELINE` (`TB-A-001`): Clean deterministic execution without worker failure.
+  - `CLASS_B_SINGLE_WORKER_FAILURE` (`TB-B-001`): Controlled single-worker failure and recovery.
+  - `CLASS_C_IN_FLIGHT_FAILURE` (`TB-C-001`): In-flight attempt loss and recovery during execution.
+  - `CLASS_D_REPEATED_FAILURE` (`TB-D-001`): Sequential multi-worker failures across distinct worker processes.
+  - `CLASS_E_RETRY_PRESSURE` (`TB-E-001`): Retry exhaustion under `max_retries=1` causing expected unrecovered failure.
+  - `CLASS_F_DUPLICATE_STALE` (`TB-F-001`): Arrival of duplicate completions verifying coordinator suppression.
+  - `CLASS_G_CAPACITY_LOSS` (`TB-G-001`): Worker disappearance without replacement (`replace_failed_workers=False`).
+  - `CLASS_H_ADVERSARIAL_TIMING` (`TB-H-001`): Failure injected at execution boundary on first job acquisition (`kill_after_jobs=0`).
+  - `CLASS_I_LARGE_WORKLOAD` (`TB-I-001`): Higher concurrency (4 workers, 40 jobs) under baseline conditions.
+- **Deterministic Oracle Expectations (`ExpectedBehavior`)**:
+  - Every benchmark scenario specifies explicit assertions covering replay validity, reconstructed run state, failure classification, root-cause counts, worker failure counts, worker replacement counts, retry bounds, completed/failed job counts, and duplicate result suppression.
+  - Differentiates *expected failure behavior* from *framework errors*: a scenario expecting unrecovered retry exhaustion (e.g. `TB-E-001`) passes when the observed failure matches expected assertions.
+- **Machine-Readable Artifact Layout**:
+  - Every execution writes standardized artifacts under `results/<scenario-id>/`:
+    - `scenario.json`: Serialized benchmark scenario specification and configuration.
+    - `trace.json`: Canonical structured execution trace event array.
+    - `replay.json`: Deterministic trace replay and validation report.
+    - `analysis.json`: Root-cause failure analysis report with causal chains.
+    - `result.json`: Authoritative JSON benchmark result with pass/fail status, telemetry, and paths.
+
+### 1.13 Known Limitations of Milestone 8
+- **In-Memory IPC Queues**: Jobs and ownership state exist in memory during active execution. A crash of the coordinator process loses all runtime state.
 - **Single-Host Distribution**: All workers execute on the local machine via OS process IPC pipes.
-- **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; no load-aware dynamic autoscaling is implemented.
-- **Rule-Based Failure Analysis**: Analysis operates strictly over deterministic evidence captured in the canonical trace; it does not speculate or infer causes that the trace does not explicitly support.
+- **Static Concurrency Only**: Worker pool size is restored to its static baseline upon failure; dynamic autoscaling and adaptive recovery policies are deferred to subsequent milestones.
+- **Single-Node Benchmark Execution**: Benchmarks run sequentially or in local isolated process pools without cross-node network orchestration.
 
 ---
 

@@ -48,7 +48,8 @@ class StaticRuntime:
         num_workers: int = 1,
         max_retries: int = 3,
         replace_failed_workers: bool = True,
-        failure_config: FailureConfig | None = None,
+        failure_config: FailureConfig | Sequence[FailureConfig] | None = None,
+        duplicate_jobs: Sequence[str] = (),
     ) -> None:
         if num_workers < 1:
             raise ValueError(f"num_workers must be at least 1, got {num_workers}")
@@ -58,7 +59,16 @@ class StaticRuntime:
         self.num_workers = num_workers
         self.max_retries = max_retries
         self.replace_failed_workers = replace_failed_workers
-        self.failure_config = failure_config
+        if failure_config is None:
+            self.failure_configs: list[FailureConfig] = []
+        elif isinstance(failure_config, FailureConfig):
+            self.failure_configs = [failure_config]
+        else:
+            self.failure_configs = list(failure_config)
+        self.failure_config = self.failure_configs[0] if self.failure_configs else None
+
+        self.duplicate_jobs: set[str] = set(duplicate_jobs)
+        self._duplicate_jobs_injected: set[str] = set()
 
         self._ctx = mp.get_context("spawn")
         self._job_queue: mp.Queue = self._ctx.Queue()
@@ -184,6 +194,13 @@ class StaticRuntime:
     # Process & Worker Pool Lifecycle
     # -------------------------------------------------------------------------
 
+    def _find_failure_config(self, worker_id: str) -> FailureConfig | None:
+        """Find the FailureConfig targeting the specified worker ID."""
+        for cfg in self.failure_configs:
+            if cfg.target_worker_id == worker_id:
+                return cfg
+        return None
+
     def start(self) -> None:
         """Spawn and start all configured worker OS processes."""
         if self._is_running:
@@ -198,10 +215,11 @@ class StaticRuntime:
             fail_target = None
             kill_after = None
             target_job = None
-            if self.failure_config and self.failure_config.target_worker_id == worker_id:
-                fail_target = self.failure_config.target_worker_id
-                kill_after = self.failure_config.kill_after_jobs
-                target_job = self.failure_config.target_job_id
+            cfg = self._find_failure_config(worker_id)
+            if cfg is not None:
+                fail_target = cfg.target_worker_id
+                kill_after = cfg.kill_after_jobs
+                target_job = cfg.target_job_id
 
             process = self._ctx.Process(
                 target=worker_process_main,
@@ -277,9 +295,13 @@ class StaticRuntime:
         """Spawn a replacement worker with distinct identity to restore pool capacity."""
         self._replacement_counter += 1
         new_worker_id = f"{dead_worker_id}-r{self._replacement_counter}"
+        cfg = self._find_failure_config(new_worker_id)
+        fail_target = cfg.target_worker_id if cfg else None
+        kill_after = cfg.kill_after_jobs if cfg else None
+        target_job = cfg.target_job_id if cfg else None
         process = self._ctx.Process(
             target=worker_process_main,
-            args=(new_worker_id, self._job_queue, self._event_queue, None, None, None),
+            args=(new_worker_id, self._job_queue, self._event_queue, fail_target, kill_after, target_job),
             name=f"TitanWorker-{new_worker_id}",
             daemon=True,
         )
@@ -544,6 +566,12 @@ class StaticRuntime:
                 },
                 timestamp=result.completed_at,
             )
+            if (
+                result.job_id in self.duplicate_jobs
+                and result.job_id not in self._duplicate_jobs_injected
+            ):
+                self._duplicate_jobs_injected.add(result.job_id)
+                self._handle_job_result(result)
             return CompletionCategory.VALID
 
         elif result.status == JobStatus.FAILED:

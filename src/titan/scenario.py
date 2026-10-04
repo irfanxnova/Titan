@@ -84,7 +84,19 @@ class Scenario:
     max_retries: int = 3
     replace_failed_workers: bool = True
     fault_config: FaultConfig | None = None
+    fault_configs: tuple[FaultConfig, ...] = ()
+    duplicate_jobs: tuple[str, ...] = ()
     timeout: float | None = None
+
+    @property
+    def all_fault_configs(self) -> tuple[FaultConfig, ...]:
+        """Aggregate all defined fault injection configurations."""
+        configs: list[FaultConfig] = []
+        if self.fault_config is not None:
+            configs.append(self.fault_config)
+        if self.fault_configs:
+            configs.extend(self.fault_configs)
+        return tuple(configs)
 
     def validate(self) -> None:
         """Validate scenario configuration prior to execution."""
@@ -102,8 +114,8 @@ class Scenario:
             raise ValueError(
                 f"Invalid pattern '{self.pattern}'. Allowed: 'uniform', 'linear', 'bimodal'"
             )
-        if self.fault_config is not None:
-            self.fault_config.validate(self.num_workers, self.num_jobs)
+        for fc in self.all_fault_configs:
+            fc.validate(self.num_workers, self.num_jobs)
 
     def generate_jobs(self) -> list[Job]:
         """Generate a strictly deterministic sequence of jobs based on configuration and seed."""
@@ -163,12 +175,13 @@ class ScenarioResult:
     def to_dict(self) -> dict:
         """Serialize scenario result to dictionary."""
         fault_payload = None
-        if self.fault_injected and self.scenario.fault_config:
+        if self.fault_injected and self.scenario.all_fault_configs:
+            fc = self.scenario.all_fault_configs[0]
             fault_payload = {
                 "enabled": True,
                 "target_worker": self.fault_target,
                 "kill_after_jobs": self.fault_point,
-                "target_job_id": self.scenario.fault_config.target_job_id,
+                "target_job_id": fc.target_job_id,
             }
 
         return {
@@ -182,6 +195,17 @@ class ScenarioResult:
                 "max_retries": self.scenario.max_retries,
                 "replace_failed_workers": self.scenario.replace_failed_workers,
                 "fault": fault_payload,
+                "faults": [
+                    {
+                        "target_worker": fc.target_worker_id,
+                        "kill_after_jobs": fc.kill_after_jobs,
+                        "target_job_id": fc.target_job_id,
+                    }
+                    for fc in self.scenario.all_fault_configs
+                ]
+                if self.scenario.all_fault_configs
+                else [],
+                "duplicate_jobs": list(self.scenario.duplicate_jobs),
             },
             "metrics": self.metrics.to_dict(),
             "trace": self.trace.to_list() if self.trace is not None else [],
@@ -193,13 +217,15 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
     scenario.validate()
     jobs = scenario.generate_jobs()
 
-    failure_cfg = scenario.fault_config.to_failure_config() if scenario.fault_config else None
+    all_cfgs = scenario.all_fault_configs
+    failure_cfg = [fc.to_failure_config() for fc in all_cfgs] if all_cfgs else None
 
     runtime = StaticRuntime(
         num_workers=scenario.num_workers,
         max_retries=scenario.max_retries,
         replace_failed_workers=scenario.replace_failed_workers,
         failure_config=failure_cfg,
+        duplicate_jobs=scenario.duplicate_jobs,
     )
     trace = None
     try:
@@ -211,9 +237,9 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
     return ScenarioResult(
         scenario=scenario,
         metrics=metrics,
-        fault_injected=scenario.fault_config is not None,
-        fault_target=scenario.fault_config.target_worker_id if scenario.fault_config else None,
-        fault_point=scenario.fault_config.kill_after_jobs if scenario.fault_config else None,
+        fault_injected=len(all_cfgs) > 0,
+        fault_target=all_cfgs[0].target_worker_id if all_cfgs else None,
+        fault_point=all_cfgs[0].kill_after_jobs if all_cfgs else None,
         trace=trace,
     )
 

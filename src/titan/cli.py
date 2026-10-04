@@ -194,32 +194,99 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional reference trace file to detect and analyze execution divergence.",
     )
 
+    # 'bench' subcommand
+    bench_parser = subparsers.add_parser(
+        "bench",
+        help="TitanBench: reproducible failure corpus and scenario runner.",
+    )
+    bench_subparsers = bench_parser.add_subparsers(
+        dest="bench_command",
+        help="Available bench subcommands",
+    )
+
+    # bench list
+    bench_list_parser = bench_subparsers.add_parser(
+        "list",
+        help="List all registered canonical TitanBench failure scenarios.",
+    )
+    bench_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output scenario list formatted as JSON.",
+    )
+
+    # bench run
+    bench_run_parser = bench_subparsers.add_parser(
+        "run",
+        help="Execute an individual TitanBench scenario by ID.",
+    )
+    bench_run_parser.add_argument(
+        "scenario_id",
+        type=str,
+        help="Stable scenario ID to run (e.g. 'TB-A-001').",
+    )
+    bench_run_parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=str,
+        default=None,
+        help="Optional custom output directory for result artifacts.",
+    )
+    bench_run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output benchmark result formatted as JSON.",
+    )
+
+    # bench run-all
+    bench_run_all_parser = bench_subparsers.add_parser(
+        "run-all",
+        help="Execute the full canonical TitanBench failure corpus.",
+    )
+    bench_run_all_parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=str,
+        default=None,
+        help="Optional custom base directory for result artifacts.",
+    )
+    bench_run_all_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output benchmark summary formatted as JSON.",
+    )
+
     return parser
 
 
 def handle_status(json_output: bool = False) -> int:
     """Print the current system status and active configuration."""
+    from titan.bench import CorpusRegistry
+
     config = TitanConfig.from_env()
+    bench_scenarios = [s.scenario_id for s in CorpusRegistry.list_all()]
 
     if json_output:
         data = {
             "name": "Titan",
             "version": __version__,
-            "milestone": "Milestone 7: Failure Classification & Root-Cause Analysis",
+            "milestone": "Milestone 8: TitanBench Failure Corpus & Scenario Runner",
             "environment": config.environment,
             "log_level": config.log_level,
             "status": "ready",
             "scenarios": list(PREDEFINED_SCENARIOS.keys()),
+            "benchmark_corpus": bench_scenarios,
         }
         print(json.dumps(data, indent=2))
     else:
         print("Titan Research Platform")
         print(f"  Version:     {__version__}")
-        print("  Milestone:   7 (Failure Classification & Root-Cause Analysis)")
+        print("  Milestone:   8 (TitanBench Failure Corpus & Runner)")
         print(f"  Environment: {config.environment}")
         print(f"  Log Level:   {config.log_level}")
-        print("  State:       Operational (Failure Analysis Active)")
+        print("  State:       Operational (TitanBench Active)")
         print(f"  Scenarios:   {', '.join(sorted(PREDEFINED_SCENARIOS.keys()))}")
+        print(f"  TitanBench:  {len(bench_scenarios)} canonical scenarios ({', '.join(bench_scenarios)})")
 
     return 0
 
@@ -593,6 +660,110 @@ def handle_analyze(
     return 0 if (report.valid and report.overall_status in ("CLEAN", "RECOVERED")) else 1
 
 
+def handle_bench_list(json_output: bool = False) -> int:
+    """List all registered canonical TitanBench failure scenarios."""
+    from titan.bench import CorpusRegistry
+
+    scenarios = CorpusRegistry.list_all()
+    if json_output:
+        print(json.dumps([s.to_dict() for s in scenarios], indent=2))
+        return 0
+
+    print("=" * 80)
+    print("TitanBench Canonical Failure Corpus")
+    print("=" * 80)
+    for s in scenarios:
+        sclass = s.scenario_class.value if hasattr(s.scenario_class, "value") else str(s.scenario_class)
+        print(f"  {s.scenario_id:<10} | {sclass:<30} | {s.name}")
+        print(f"             Description: {s.description}")
+        print(
+            f"             Config: {s.scenario.num_workers} workers, {s.scenario.num_jobs} jobs, "
+            f"retries={s.scenario.max_retries}, replace={s.scenario.replace_failed_workers}"
+        )
+        print("-" * 80)
+    print(f"Total registered scenarios: {len(scenarios)}")
+    print("=" * 80)
+    return 0
+
+
+def handle_bench_run(
+    scenario_id: str,
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute an individual TitanBench scenario by ID and evaluate oracle."""
+    from titan.bench import BenchmarkStatus, CorpusRegistry, TitanBenchRunner
+
+    try:
+        scenario = CorpusRegistry.get(scenario_id)
+    except KeyError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    runner = TitanBenchRunner()
+    result = runner.run_scenario(scenario, output_dir=output_dir)
+
+    if json_output:
+        print(result.to_json())
+        return 0 if result.status == BenchmarkStatus.PASS else 1
+
+    print("=" * 66)
+    print("TitanBench Execution & Verification Report")
+    print("=" * 66)
+    print(f"  Scenario ID:             {result.scenario_id}")
+    print(f"  Class:                   {result.scenario_class}")
+    print(f"  Status:                  {result.status.value}")
+    print(f"  Reason:                  {result.reason}")
+    print(f"  Replay Status:           {result.replay_outcome}")
+    print(f"  Root Failure Count:      {result.root_failures_count}")
+    print(f"  Recovery Classification: {result.recovery_status}")
+    print(f"  Jobs (Total/Comp/Fail):  {result.total_jobs} / {result.completed_jobs} / {result.failed_jobs}")
+    print(f"  Attempts / Retries:      {result.total_attempts} / {result.retries}")
+    print(f"  Worker Failures/Repl:    {result.worker_failures} / {result.worker_replacements}")
+    print(f"  Duplicates Ignored:      {result.duplicate_results_ignored}")
+    print(f"  Artifact Location:       {result.artifacts.result_path or 'None'}")
+    print("=" * 66)
+
+    return 0 if result.status == BenchmarkStatus.PASS else 1
+
+
+def handle_bench_run_all(
+    output_dir: str | None = None,
+    json_output: bool = False,
+) -> int:
+    """Execute all canonical TitanBench failure scenarios sequentially."""
+    from titan.bench import BenchmarkStatus, TitanBenchRunner
+
+    runner = TitanBenchRunner(output_base_dir=output_dir or "results")
+    summary = runner.run_all()
+
+    if json_output:
+        print(summary.to_json())
+        return 0 if summary.all_passed else 1
+
+    print("=" * 80)
+    print("TitanBench Canonical Failure Corpus Run")
+    print("=" * 80)
+    for res in summary.results:
+        print(
+            f"  [{res.status.value:<4}] {res.scenario_id:<10} ({res.scenario_class:<30}) "
+            f"Replay: {res.replay_outcome:<5} | Roots: {res.root_failures_count} | "
+            f"Recovery: {res.recovery_status}"
+        )
+        if res.status != BenchmarkStatus.PASS:
+            print(f"         Reason: {res.reason}")
+
+    print("=" * 80)
+    print(
+        f"TitanBench Summary: {summary.passed}/{summary.total_scenarios} passed "
+        f"({summary.failed} failed, {summary.invalid} invalid) in {summary.total_duration_sec:.2f}s."
+    )
+    print(f"Artifacts saved under: {runner.output_base_dir}")
+    print("=" * 80)
+
+    return 0 if summary.all_passed else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main execution entry point."""
     parser = build_parser()
@@ -636,9 +807,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_trace_file=args.expected_trace_file,
         )
 
+    if args.command == "bench":
+        if args.bench_command == "list":
+            return handle_bench_list(json_output=args.json)
+        elif args.bench_command == "run":
+            return handle_bench_run(
+                scenario_id=args.scenario_id,
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        elif args.bench_command == "run-all":
+            return handle_bench_run_all(
+                output_dir=args.output_dir,
+                json_output=args.json,
+            )
+        else:
+            print("Error: Specify a bench subcommand (list, run, run-all). See 'titan bench --help'.", file=sys.stderr)
+            return 1
+
     parser.print_help()
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

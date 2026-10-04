@@ -309,6 +309,35 @@ This document records the architectural decisions made for the Titan project. Ea
   - *Positive*: Provides an automated, deterministic diagnostic layer answering what failed, where, why, and whether recovery succeeded; preserves clear causal chains; guarantees identical output for identical traces without probabilistic heuristics.
   - *Negative*: Analysis is constrained by evidence present in the canonical trace; unobserved external anomalies outside the trace schema cannot be diagnosed.
 
+---
+
+## ADR-018: TitanBench — Reproducible Failure Corpus & Scenario Runner
+
+- **Status**: Accepted
+- **Date**: 2026-10-04
+- **Context**: Across Milestones 2 through 7, Titan established an authoritative runtime, deterministic scenario definitions, structured event tracing, deterministic replay, fidelity divergence detection, and root-cause failure analysis. However, there was no centralized, versioned failure corpus or benchmark harness to systematically execute, replay, validate, analyze, and compare distributed failure behaviors across canonical failure classes. Experimental reproducibility requires a standardized failure corpus and runner that operates on explicit oracle expectations rather than relying solely on non-zero exit codes or ad-hoc test scripts.
+- **Decision**:
+  1. Build **TitanBench** (`src/titan/bench/`) as a dedicated, versioned benchmark layer completely decoupled from Titan's core runtime.
+  2. Implement an explicit scenario specification (`BenchmarkScenario`) wrapping Titan's authoritative `Scenario` configuration with benchmark metadata (stable IDs, category classes, descriptions, and deterministic oracle assertions).
+  3. Define 9 canonical scenario classes (A through I) with stable identifiers (`TB-A-001` through `TB-I-001`):
+     - `CLASS_A_BASELINE` (`TB-A-001`): Clean deterministic execution without faults.
+     - `CLASS_B_SINGLE_WORKER_FAILURE` (`TB-B-001`): Controlled single-worker failure and automatic replacement/recovery.
+     - `CLASS_C_IN_FLIGHT_FAILURE` (`TB-C-001`): In-flight attempt interruption and reassignment.
+     - `CLASS_D_REPEATED_FAILURE` (`TB-D-001`): Sequential multi-worker failures across distinct worker processes.
+     - `CLASS_E_RETRY_PRESSURE` (`TB-E-001`): Intentional retry exhaustion and unrecovered failure under `max_retries=1`.
+     - `CLASS_F_DUPLICATE_STALE` (`TB-F-001`): Duplicate completion ingestion and coordinator suppression.
+     - `CLASS_G_CAPACITY_LOSS` (`TB-G-001`): Worker termination without replacement (`replace_failed_workers=False`).
+     - `CLASS_H_ADVERSARIAL_TIMING` (`TB-H-001`): Boundary failure injected at `kill_after_jobs=0` on first job acquisition.
+     - `CLASS_I_LARGE_WORKLOAD` (`TB-I-001`): Scaled concurrency (4 workers, 40 jobs) under baseline conditions.
+  4. Implement explicit deterministic oracle evaluation (`ExpectedBehavior`). A scenario passes only if observed execution, trace replay validity, and failure analysis report strictly match defined assertions. Expected unrecovered failures (e.g. `TB-E-001`) evaluate to `PASS` rather than being treated as infrastructure crashes.
+  5. Implement `TitanBenchRunner` executing the canonical pipeline: Scenario -> Execution -> Trace capture -> Trace Replay -> Failure Analysis -> Oracle Evaluation -> Machine-readable Artifact persistence (`results/<scenario-id>/`).
+  6. Standardize artifact directory layouts: `scenario.json`, `trace.json`, `replay.json`, `analysis.json`, `result.json`.
+  7. Provide first-class CLI commands: `titan bench list`, `titan bench run <id> [--json]`, and `titan bench run-all [--json]`.
+- **Consequences**:
+  - *Positive*: Establishes Titan's first reproducible failure corpus; unifies execution, trace capture, replay, and root-cause analysis in a single automated runner; distinguishes expected failure behavior from framework errors; creates a rock-solid foundation for future recovery-policy experiments and ablation studies.
+  - *Negative*: Scenarios must be run in sequence or with isolated process pools to prevent port/queue interference on single-node environments.
+
+
 
 
 
