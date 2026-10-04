@@ -101,12 +101,12 @@ python src/titan/cli.py status
 ```
 
 ### Running Automated Tests
-Run the 21-test automated suite using Python's built-in runner:
+Run the 26-test automated suite using Python's built-in standard library runner (zero external dependencies required):
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-Or using `pytest`:
+Or using `pytest` (if installed in your Python environment):
 ```powershell
 pytest -v
 ```

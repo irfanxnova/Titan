@@ -160,6 +160,12 @@ def handle_run(
     if max_retries < 1:
         print(f"Error: --max-retries must be at least 1, got {max_retries}", file=sys.stderr)
         return 1
+    if kill_after_jobs is not None and kill_after_jobs < 0:
+        print(f"Error: --kill-after-jobs cannot be negative, got {kill_after_jobs}", file=sys.stderr)
+        return 1
+    if kill_after_jobs is not None and kill_worker is None:
+        print("Error: --kill-after-jobs requires --kill-worker to be specified", file=sys.stderr)
+        return 1
 
     failure_config: FailureConfig | None = None
     if kill_worker is not None:

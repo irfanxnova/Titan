@@ -82,6 +82,66 @@ class TestTitanSkeleton(unittest.TestCase):
         self.assertEqual(data["version"], "0.1.0")
         self.assertEqual(data["status"], "ready")
 
+    def test_cli_run_text(self) -> None:
+        """Verify the CLI run command executes and displays text report."""
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            exit_code = main(["run", "--workers", "1", "--jobs", "2", "--work-units", "50"])
+        self.assertEqual(exit_code, 0)
+        output = stdout_capture.getvalue()
+        self.assertIn("Titan Runtime Execution & Recovery Report", output)
+        self.assertIn("Jobs Submitted (Unique):       2", output)
+        self.assertIn("Jobs Completed (Unique):       2", output)
+
+    def test_cli_run_json(self) -> None:
+        """Verify the CLI run command outputs structured JSON metrics."""
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            exit_code = main(["run", "--workers", "1", "--jobs", "3", "--work-units", "50", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(stdout_capture.getvalue())
+        self.assertIn("config", data)
+        self.assertIn("metrics", data)
+        self.assertEqual(data["config"]["workers"], 1)
+        self.assertEqual(data["config"]["jobs"], 3)
+        self.assertEqual(data["metrics"]["total_unique_submitted"], 3)
+        self.assertEqual(data["metrics"]["total_completed_unique"], 3)
+
+    def test_cli_run_invalid_worker_count(self) -> None:
+        """Verify the CLI run command rejects non-positive worker count."""
+        stderr_capture = io.StringIO()
+        with patch("sys.stderr", stderr_capture):
+            exit_code = main(["run", "--workers", "0"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Error: --workers must be at least 1", stderr_capture.getvalue())
+
+    def test_cli_run_kill_after_jobs_without_kill_worker(self) -> None:
+        """Verify the CLI run command rejects --kill-after-jobs without --kill-worker."""
+        stderr_capture = io.StringIO()
+        with patch("sys.stderr", stderr_capture):
+            exit_code = main(["run", "--kill-after-jobs", "5"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Error: --kill-after-jobs requires --kill-worker to be specified", stderr_capture.getvalue())
+
+    def test_cli_run_failure_injection_via_cli(self) -> None:
+        """Verify that failure injection works end-to-end through CLI flags."""
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            exit_code = main([
+                "run",
+                "--workers", "2",
+                "--jobs", "10",
+                "--work-units", "500",
+                "--kill-worker", "0",
+                "--kill-after-jobs", "2",
+                "--json",
+            ])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(stdout_capture.getvalue())
+        self.assertGreaterEqual(data["metrics"]["worker_failures"], 1)
+        self.assertGreaterEqual(data["metrics"]["jobs_recovered"], 1)
+        self.assertEqual(data["metrics"]["total_completed_unique"], 10)
+
 
 if __name__ == "__main__":
     unittest.main()
